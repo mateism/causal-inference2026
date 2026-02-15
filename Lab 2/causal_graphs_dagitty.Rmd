@@ -216,20 +216,20 @@ because **Y depends on D** through the causal effect.
 We can show this with a DAG:
 
 ```{r}
-dag_complex2 <- dagitty("dag {
-  # Causal effect:
-  D -> M -> Y
+# Causal effect: D -> M -> Y
+# Confounder: U1 affects D and Y
+# Upstream driver: U2 affects U1 and Y
 
-  # Observed pre-treatment confounder:
+dag_complex2 <- dagitty("dag {
+  D -> M -> Y
   U1 -> D
   U1 -> Y
-
-  # Upstream driver of U1 and Y (deeper structure / measurement issues):
   U2 -> U1
   U2 -> Y
 }")
 
-ggdag(dag_complex2, text = FALSE) + theme_dag()
+
+ggdag(dag_complex2) + theme_dag()
 ```
 
 ### Key takeaway via d-separation
@@ -237,8 +237,10 @@ ggdag(dag_complex2, text = FALSE) + theme_dag()
 Even conditioning on U1, **D is not d-separated from Y** because the directed causal path remains.
 
 ```{r}
+impliedConditionalIndependencies(dag_complex2)
 dseparated(dag_complex2, "D", "Y", "U1")          # FALSE
-dseparated(dag_complex2, "D", "Y", c("U1","M"))   # TRUE (but note: conditioning on M changes estimand)
+dseparated(dag_complex2, "D", "Y", c("U1","M"))   # TRUE (but note: conditioning on M changes estimand. To get the total effect, we would not condition on M.)
+adjustmentSets(dag_complex2, exposure = "D", outcome = "Y")  # U1 is a valid adjustment set for the total effect, but it does not make D and Y independent because of the causal path through M.
 ```
 
 **Interpretation**
