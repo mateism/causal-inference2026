@@ -70,6 +70,7 @@ ggdag(dag_med, text = TRUE) +
   ) +
   ggtitle("Mediator: conditioning on Z blocks the path from X to Y")
 ```
+
 ### Implied independencies and conditioning
 
 - In a simple chain, **X and Y are associated** (because X can reach Y through Z).
