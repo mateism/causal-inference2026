@@ -32,7 +32,7 @@ This lab is a practical companion to the lecture. We focus on:
 - **Noncompliance** (assignment vs treatment received)
 - **Instrumental variables** (IV / Wald / 2SLS as LATE under assumptions)
 - **Attrition** (missing outcomes and what it breaks)
-- *(Optional)* **covariate adjustment for precision**
+- **Covariate adjustment for precision**
 
 We will:
 1) sketch **DAGs** for two motivating examples (Identity; Masking),
@@ -47,7 +47,7 @@ We will:
 pkgs <- c(
   "tidyverse", "dagitty", "ggdag",
   "estimatr", "AER", "broom", "modelsummary",
-  "patchwork", "here"
+  "patchwork", "here", "xtable"
 )
 
 to_install <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
@@ -62,55 +62,27 @@ library(broom)
 library(modelsummary)
 library(patchwork)
 library(here)
+library(xtable)
 ```
 
 ---
 
-# 3) Motivating examples (DAGs only)
+# 3) Motivating example 
 
-## 3.1 Social identity and social preferences (Chen & Li 2009): DAG sketch
-
-**Simplified causal story**
-
-- `A`: random assignment to identity prime
-- `P`: psychological salience / identity activation (mechanism)
-- `Y`: pro-social behavior (e.g., allocation/choice)
-- `D`: baseline traits (pre-treatment), e.g., altruism, demographics
-
-Key idea: because `A` is randomized, `A ⟂ D`, so comparing by `A` is causal for **assignment**.
-
-```{r dag-identity}
-dag_identity <- dagitty("
-dag {
-
-  D -> Y
-  A -> P
-  P -> Y
-}
-")
-
-ggdag(dag_identity) + theme_dag()
-```
-
-**Lab note:** Regressing `Y ~ A` estimates the ITT. Regressing `Y ~ P` may be confounded because `D` might affect `P`.
-
----
-
-## 3.2 Community masking during COVID (Abaluck et al. 2022): DAG sketch
+## Community masking during COVID (Abaluck et al. 2022): DAG sketch
 
 **Simplified causal story** (cluster RCT)
 
 - `Z`: village-level assignment to mask campaign
 - `M`: mask wearing (uptake/compliance)
 - `Y`: COVID outcomes (symptoms/seroprevalence)
-- `D`: baseline risk factors / mixing patterns (pre-treatment)
+- `X`: pre-treatment covariates
 
 ```{r dag-masking}
 dag_masking <- dagitty("
 dag {
-
-
-  D -> Y
+  X -> Y
+  X -> M
   Z -> M
   M -> Y
 }
@@ -118,8 +90,6 @@ dag {
 
 ggdag(dag_masking) + theme_dag()
 ```
-
-**Lab note:** In cluster RCTs, use cluster-robust SEs and consider spillovers/interference (not covered here).
 
 ---
 
@@ -133,6 +103,7 @@ We create:
 - missing outcome indicator `R` to represent **attrition**.
 
 ```{r simulate-data}
+set.seed(123)
 n <- 3000
 
 df <- tibble(
@@ -214,7 +185,7 @@ m_interest <- lm_robust(baseline_interest ~ Z, data = df)
 
 modelsummary(
   list("Age" = m_age, "Female" = m_female, "Baseline interest" = m_interest),
-  statistic = "({std.error})",
+  statistic = c("({std.error})", "p = {p.value}"),
   gof_omit = "IC|Log|Adj|Within"
 )
 ```
@@ -302,7 +273,7 @@ tidy(attr_cov)
 
 ---
 
-# 10) Optional: Covariate adjustment for precision
+# 10) Covariate adjustment for precision
 
 Even with randomization, controlling for strong predictors of `Y` can improve precision.
 
@@ -311,206 +282,431 @@ itt_adj <- lm_robust(Y_obs ~ Z + age + female + baseline_interest, data = df, se
 
 modelsummary(
   list("ITT (unadjusted)" = itt, "ITT (adjusted)" = itt_adj),
-  statistic = "({std.error})",
+  statistic = c("({std.error})", "p = {p.value}"),
   gof_omit = "IC|Log|Adj|Within"
 )
 ```
 
+```{r precision}
+iv_adj_r <- iv_robust(
+  Y_obs ~ D + age + female + baseline_interest |
+    Z + age + female + baseline_interest,
+  data = df,
+  se_type = "stata"
+)
+modelsummary(
+  list("IV (unadjusted)" = iv_fit, "IV (adjusted)" = iv_adj_r),
+  statistic = c("({std.error})", "p = {p.value}"),
+  gof_omit = "IC|Log|Adj|Within"
+)
+```
 ---
 
 # 11) Applied template: Aggarwal et al. (2023) digital advertising & turnout
 
 Goal: keep only the replication-package components relevant to *today’s topics*:
-- randomization / ITT
+- estimation for randomization (ITT / conditional ITT)
 - balance
-- noncompliance + IV (if applicable)
-- attrition / sample construction
-- (optional) precision adjustment
 
 **Paper DOI:** https://doi.org/10.1038/s41562-022-01487-4  
 **Replication package:** https://isps.yale.edu/research/data/d199
 
-## 11.1 Set the replication root folder
+# Replication Archive for: Aggarwal, Minali, Jennifer Allen, Alex Coppock, 
+# Dan Frankowski, Sol Messing, Kelly Zhang, James Barnes, Andrew Beasley, 
+# Harry Hantman, and Sylvan Zheng: The impact of digital campaign advertising 
+# during the 2020 US presidential election: evidence from survey experiments, 
+# field experiments, and a campaign-level experiment. 
+# Nature Human Behavior, forthcoming.
 
-Unzip the replication package, then set a local path:
+## 11.1 Figure 1: Average treatment effects and CATEs of treatment on 2020 turnout under three inverse probability-weighted regression specifications
+```{r fig1}
+source('Lab 3/helper_file.R')
 
-```{r aggarwal-path, eval=FALSE}
-# CHANGE THIS to your local folder path
-rep_root <- "PATH/TO/UNZIPPED/REPLICATION_PACKAGE"
+# load data and uncount
+aggregated_set <- read_rds(file = "Lab 3/aggregated_analysis_set.rds")
+main_analysis_set <- uncount(aggregated_set, weights = n)
 
-list.files(rep_root)
-```
+formula_1 <- formula("voted_in_2020 ~ condition") 
+formula_2 <- formula("voted_in_2020 ~ condition + num_times_voted + tss_100 + pts_100")
+formula_3 <- formula("voted_in_2020 ~ condition + pts_100 + tss_100 + voted_in_2000 + voted_in_2002 + voted_in_2004 + voted_in_2006 + voted_in_2008 + voted_in_2010 + voted_in_2012 + voted_in_2014 + voted_in_2016 + voted_in_2018 + strata + party_dem + party_rep + party_unknown")
 
-## 11.2 Create a "Lab 3 subset" folder
+fit_ate_1 <-
+  lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = main_analysis_set
+  ) %>% tidy
 
-This copies only files likely relevant to our topics, based on keywords.
-You will probably tweak the keywords after inspecting the folder structure.
+fit_ate_2 <-
+  lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = main_analysis_set
+  ) %>% tidy
 
-```{r aggarwal-subset, eval=FALSE}
-subset_dir <- file.path(rep_root, "lab3_subset")
-dir.create(subset_dir, showWarnings = FALSE)
+fit_ate_3 <-
+  lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = main_analysis_set
+  ) %>% tidy
 
-# Common folder names (adjust if your package differs)
-code_dir <- file.path(rep_root, "code")
-data_dir <- file.path(rep_root, "data")
 
-all_code <- if(dir.exists(code_dir)) list.files(code_dir, recursive = TRUE, full.names = TRUE) else character(0)
-all_data <- if(dir.exists(data_dir)) list.files(data_dir, recursive = TRUE, full.names = TRUE) else character(0)
+tss_cates_1 <-
+  main_analysis_set %>%
+  group_by(tss_bucket) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
 
-keep_code <- all_code[
-  str_detect(tolower(all_code),
-             "clean|build|analysis|main|itt|balance|random|attrit|missing|iv|2sls|firststage|compliance|sample")
-]
+tss_cates_2 <-
+  main_analysis_set %>%
+  group_by(tss_bucket) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
 
-keep_data <- all_data[
-  str_detect(tolower(all_data),
-             "analysis|final|clean|derived|turnout|assignment|treat|exposure|merged|match|link|sample")
-]
+tss_cates_3 <-
+  main_analysis_set %>%
+  group_by(tss_bucket) %>%
+  do(tidy(lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = .
+  )))
 
-dir.create(file.path(subset_dir, "code"), showWarnings = FALSE)
-dir.create(file.path(subset_dir, "data"), showWarnings = FALSE)
 
-file.copy(keep_code, file.path(subset_dir, "code"), overwrite = TRUE)
-file.copy(keep_data, file.path(subset_dir, "data"), overwrite = TRUE)
+race_cates_1 <-
+  main_analysis_set %>%
+  group_by(race) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
 
-writeLines(
-  c("CODE FILES:", keep_code, "", "DATA FILES:", keep_data),
-  file.path(subset_dir, "MANIFEST_lab3_subset.txt")
-)
+race_cates_2 <-
+  main_analysis_set %>%
+  group_by(race) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
 
-list.files(subset_dir, recursive = TRUE)
-```
+race_cates_3 <-
+  main_analysis_set %>%
+  group_by(race) %>%
+  do(tidy(lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = .
+  )))
 
-## 11.3 Load the analysis dataset (you adapt file name)
 
-```{r aggarwal-load, eval=FALSE}
-library(readr)
+gender_cates_1 <-
+  main_analysis_set %>%
+  group_by(gender) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
 
-# Replace with the actual dataset name you find:
-dat_path <- file.path(rep_root, "lab3_subset", "data", "analysis_data.csv")
-ad <- read_csv(dat_path)
-glimpse(ad)
-```
+gender_cates_2 <-
+  main_analysis_set %>%
+  group_by(gender) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
 
-## 11.4 Map variables to lab notation
+gender_cates_3 <-
+  main_analysis_set %>%
+  group_by(gender) %>%
+  do(tidy(lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = .
+  )))
 
-Create a standardized analysis frame:
-- `Z`: assignment (randomized encouragement)
-- `D`: treatment received / exposure (if different from Z)
-- `Y`: turnout outcome
-- `X`: pre-treatment covariates
-- `cluster_id`: if assignment is clustered
-- `R`: missingness indicator (attrition)
 
-```{r aggarwal-map, eval=FALSE}
-ad2 <- ad %>%
-  transmute(
-    Z = assigned_treatment,     # <-- change
-    D = actual_exposure,        # <-- change (or set D = Z if perfect compliance)
-    Y = turnout,                # <-- change
-    cluster_id = geo_cluster,   # <-- optional / change
-    # Covariates (edit)
-    age = age,
-    female = female,
-    past_turnout = past_turnout
+age_cates_1 <-
+  main_analysis_set %>%
+  group_by(agecat) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
+
+age_cates_2 <-
+  main_analysis_set %>%
+  group_by(agecat) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
+
+age_cates_3 <-
+  main_analysis_set %>%
+  group_by(agecat) %>%
+  do(tidy(lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = .
+  )))
+
+
+close_margins_2016_cates_1 <-
+  main_analysis_set %>%
+  group_by(close_margins_2016) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
+
+close_margins_2016_cates_2 <-
+  main_analysis_set %>%
+  group_by(close_margins_2016) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
+
+close_margins_2016_cates_3 <-
+  main_analysis_set %>%
+  group_by(close_margins_2016) %>%
+  do(tidy(lm_robust(
+    formula = formula_3,
+    weights = ipw,
+    data = .
+  )))
+
+
+party_cates_1 <-
+  main_analysis_set %>%
+  group_by(party) %>%
+  do(tidy(lm_robust(
+    formula = formula_1,
+    weights = ipw,
+    data = .
+  )))
+
+party_cates_2 <-
+  main_analysis_set %>%
+  group_by(party) %>%
+  do(tidy(lm_robust(
+    formula = formula_2,
+    weights = ipw,
+    data = .
+  )))
+
+formula_3_party <- formula("voted_in_2020 ~ condition + pts_100 + tss_100 + 
+                           voted_in_2000 + voted_in_2002 + voted_in_2004 + 
+                           voted_in_2006 + voted_in_2008 + voted_in_2010 + 
+                           voted_in_2012 + voted_in_2014 + voted_in_2016 + 
+                           voted_in_2018 + strata")
+
+party_cates_3 <-
+  main_analysis_set %>%
+  group_by(party) %>%
+  do(tidy(lm_robust(
+    formula = formula_3_party,
+    weights = ipw,
+    data = .
+  )))
+
+
+estimates_df_1 <-
+  bind_rows(
+    `ATE` = fit_ate_1,
+    `Gender` = gender_cates_1,
+    `Race` = race_cates_1,
+    `Age` = age_cates_1,
+    `Margin` = close_margins_2016_cates_1,
+    `Trump support` = tss_cates_1,
+    `Partisanship` = party_cates_1,
+    .id = "covariate"
+  )
+
+estimates_df_2 <-
+  bind_rows(
+    `ATE` = fit_ate_2,
+    `Gender` = gender_cates_2,
+    `Race` = race_cates_2,
+    `Age` = age_cates_2,
+    `Margin` = close_margins_2016_cates_2,
+    `Trump support` = tss_cates_2,
+    `Partisanship` = party_cates_2,
+    .id = "covariate"
+  )
+
+estimates_df_3 <-
+  bind_rows(
+    `ATE` = fit_ate_3,
+    `Gender` = gender_cates_3,
+    `Race` = race_cates_3,
+    `Age` = age_cates_3,
+    `Margin` = close_margins_2016_cates_3,
+    `Trump support` = tss_cates_3,
+    `Partisanship` = party_cates_3,
+    .id = "covariate"
+  )
+
+
+gg_df <-
+  bind_rows(
+    `Unadjusted` = estimates_df_1,
+    `PAP adjustment set` = estimates_df_2,
+    `Full adjustment set` = estimates_df_3,
+    .id = "estimator",
   ) %>%
-  mutate(R = is.na(Y))
+  filter(term == "conditiontreat") %>%
+  mutate(
+    covariate_value = coalesce(gender, race, agecat, close_margins_2016, tss_bucket, party),
+    covariate_value = replace_na(covariate_value, "ATE"),
+    covariate = factor(
+      covariate,
+      levels = c(
+        "ATE",
+        "Age",
+        "Gender",
+        "Race",
+        "Margin",
+        "Partisanship",
+        "Trump support"
+      )
+    ),
+    entry = make_se_entry(estimate, std.error, digits = 3),
+    estimator = factor(estimator, levels = c("Unadjusted", "PAP adjustment set", "Full adjustment set"))
+  )
 
-glimpse(ad2)
+
+g <-
+  ggplot(data = gg_df, aes(estimate, covariate_value)) +
+  geom_point() +
+  geom_text(
+    aes(label = entry, x = estimate + sign(estimate) * 0.004),
+    size = 2,
+    nudge_y = 0.25,
+    color = gray(0.45)
+  ) +
+  geom_linerange(aes(xmin = conf.low, xmax = conf.high)) +
+  facet_grid(rows = vars(covariate),
+             cols = vars(estimator),
+             scales = "free_y", space = "free") +
+  geom_vline(xintercept = 0,
+             color = "red",
+             linetype = "dotted",
+             alpha = 0.5) +
+  coord_cartesian(xlim = c(-0.02, 0.02)) +
+  scale_x_continuous(breaks = c(-0.01, 0.01)) +
+  theme_minimal() +
+  theme(axis.title.y = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  xlab("Average and Conditional Average Treatment Effect Estimates")
+
+#ggsave("output/figure_1.pdf", g, width = 6.5, height = 6)
+g
 ```
 
-## 11.5 ITT
+## 11.2 Figure 5: Balance on pre-treatment covariates
+```{r fig5}
+source('Lab 3/helper_file.R')
 
-```{r aggarwal-itt, eval=FALSE}
-itt_ag <- lm_robust(Y ~ Z, data = ad2, se_type = "stata")
-tidy(itt_ag)
-```
+# load data and uncount
+aggregated_set <- read_rds(file = "Lab 3/aggregated_analysis_set.rds")
+main_analysis_set <- uncount(aggregated_set, weights = n)
 
-If clustered assignment, do:
+all_covs <-
+  c(
+    'party_dem',
+    'party_rep',
+    'party_unknown',
+    'party_other',
+    'tss_30_40',
+    'tss_40_50',
+    'tss_50_60',
+    'tss_60_70',
+    'tss_100',
+    'pts_100',
+    "ideology_score_100",
+    "partisan_score_100",
+    "voted_in_2000",
+    "voted_in_2002",
+    "voted_in_2004",
+    "voted_in_2006",
+    "voted_in_2008",
+    "voted_in_2010",
+    "voted_in_2012",
+    "voted_in_2014",
+    "voted_in_2016",
+    "voted_in_2018"
+  )
 
-```{r aggarwal-itt-cluster, eval=FALSE}
-itt_ag_cl <- lm_robust(Y ~ Z, data = ad2, se_type = "CR2", clusters = cluster_id)
-tidy(itt_ag_cl)
-```
+cov_labels <-
+  c(
+    'Party: Democrat',
+    'Party: Republican',
+    'Party: Unknown',
+    'Party: Other',
+    'TSS: 30-40',
+    'TSS: 40-50',
+    'TSS: 50-60',
+    'TSS: 60-70',
+    'Trump support score / 100',
+    'Turnout score / 100',
+    "Ideology score / 100",
+    "Partisanship score / 100",
+    "Voted in 2000",
+    "Voted in 2002",
+    "Voted in 2004",
+    "Voted in 2006",
+    "Voted in 2008",
+    "Voted in 2010",
+    "Voted in 2012",
+    "Voted in 2014",
+    "Voted in 2016",
+    "Voted in 2018"
+  )
 
-## 11.6 Balance
 
-```{r aggarwal-balance, eval=FALSE}
-balance_covars <- c("age", "female", "past_turnout")
+balance_regs <-
+  lm_robust(formula = formula(paste0(
+    "cbind(", paste0(all_covs, collapse = ", "), ") ~ condition"
+  )),
+  weights = ipw,
+  data = main_analysis_set)
 
-bal <- lapply(balance_covars, function(v){
-  f <- as.formula(paste(v, "~ Z"))
-  lm_robust(f, data = ad2) %>% tidy() %>% mutate(var = v)
-}) %>% bind_rows()
+balance_df <-
+  tidy(balance_regs) %>%
+  filter(term == "conditiontreat") %>% 
+  mutate(outcome = factor(outcome, levels = all_covs, labels = cov_labels),
+         adjusted_p = p.adjust(p.value, method = "BH"))
 
-bal %>% filter(term == "Z") %>% select(var, estimate, std.error, p.value)
-```
+g <- 
+ggplot(balance_df, aes(estimate, outcome)) +
+  geom_point() +
+  geom_linerange(aes(xmin = conf.low, xmax = conf.high)) +
+  geom_vline(xintercept = 0, color= "red", linetype = "dotted", alpha = 0.5) +
+  scale_x_continuous(breaks = seq(-0.01, 0.01, 0.005)) +
+  coord_cartesian(xlim = c(-0.01, 0.01)) +
+  theme_minimal() +
+  theme(axis.title.y = element_blank(),
+        panel.grid.minor.x = element_blank()) +
+  labs(x = "Differences in mean pre-treatment covariate values")
 
-## 11.7 Noncompliance & IV (only if D differs from Z)
-
-```{r aggarwal-iv, eval=FALSE}
-# First stage
-fs_ag <- lm_robust(D ~ Z, data = ad2, se_type = "stata")
-tidy(fs_ag)
-
-# Wald ratio
-ITT_Y_ag <- coef(itt_ag)["Z"]
-ITT_D_ag <- coef(fs_ag)["Z"]
-wald_ag <- ITT_Y_ag / ITT_D_ag
-wald_ag
-
-# 2SLS
-iv_ag <- ivreg(Y ~ D | Z, data = ad2)
-summary(iv_ag)
-```
-
-## 11.8 Attrition diagnostics
-
-```{r aggarwal-attrition, eval=FALSE}
-# Missingness by assignment
-lm_robust(R ~ Z, data = ad2, se_type = "stata") %>% tidy()
-
-# Missingness by covariates + assignment
-lm_robust(R ~ Z + age + female + past_turnout, data = ad2, se_type = "stata") %>% tidy()
-```
-
-## 11.9 Optional: precision adjustment
-
-```{r aggarwal-precision, eval=FALSE}
-adj_ag <- lm_robust(Y ~ Z + age + female + past_turnout, data = ad2, se_type = "stata")
-modelsummary(
-  list("ITT unadjusted" = itt_ag, "ITT adjusted" = adj_ag),
-  statistic = "({std.error})",
-  gof_omit = "IC|Log|Adj|Within"
-)
-```
-
----
-
-# 12) DAG wrap-up for the digital ads setting (assignment + noncompliance)
-
-A standard “encouragement design” DAG:
-
-- `Z` (random assignment) affects `D` (exposure/treatment received),
-- `D` affects `Y` (turnout),
-- baseline covariates `X` affect both `D` and `Y`.
-
-```{r dag-ads}
-dag_ads <- dagitty("
-dag {
-  X [pos='0,0']
-  Z [pos='1,1']
-  D [pos='2,1']
-  Y [pos='3,0']
-
-  X -> D
-  X -> Y
-  Z -> D
-  D -> Y
-}
-")
-
-ggdag(dag_ads, text = FALSE) + theme_dag()
+#ggsave("output/figure_5.pdf", width = 6.5, height = 3.5)
+g
 ```
 
 **Key links to concepts in this lab:**
@@ -518,6 +714,5 @@ ggdag(dag_ads, text = FALSE) + theme_dag()
 - balance checks test `Z ⟂ X` in sample (diagnostic)
 - `Z -> D` is the first stage (noncompliance)
 - IV uses `Z` to identify effect of `D` on `Y` under assumptions
-- attrition threatens interpretation if missingness depends on `Z` or on outcome-related variables
-
+- covariate adjustment can improve precision by controlling for `X` that predict `Y`.
 ---
