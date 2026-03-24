@@ -47,15 +47,15 @@ library(hbal)
 source("https://raw.githubusercontent.com/xuyiqing/lalonde/main/tutorial/functions.R")
 
 # Download the LDW data if it is not already in your working directory
-if (!file.exists("lalonde.RData")) {
+if (!file.exists("Lab 6/lalonde.RData")) {
   download.file(
     url = "https://raw.githubusercontent.com/xuyiqing/lalonde/main/tutorial/data/lalonde.RData",
-    destfile = "lalonde.RData",
+    destfile = "Lab 6/lalonde.RData",
     mode = "wb"
   )
 }
 
-load("lalonde.RData")
+load("Lab 6/lalonde.RData")
 
 # Variables used throughout the lab
 Y <- "re78"
