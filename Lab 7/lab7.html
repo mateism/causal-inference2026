@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="">
+<meta name="dcterms.date" content="2026-03-25">
+
+<title>Lab 7: Collider Bias in Practice</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="lab7_files/libs/clipboard/clipboard.min.js"></script>
+<script src="lab7_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="lab7_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="lab7_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="lab7_files/libs/quarto-html/popper.min.js"></script>
+<script src="lab7_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="lab7_files/libs/quarto-html/anchor.min.js"></script>
+<link href="lab7_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="lab7_files/libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="lab7_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="lab7_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="lab7_files/libs/bootstrap/bootstrap-d6a003b94517c951b2d65075d42fb01b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 7: Collider Bias in Practice</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 25, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="overview" class="level1">
+<h1>Overview</h1>
+<p>This lab turns the collider lecture into a set of practical simulations. We will focus on three questions:</p>
+<ol type="1">
+<li><strong>Why are colliders problematic?</strong></li>
+<li><strong>How do familiar applied problems become collider bias?</strong></li>
+<li><strong>Why can M-bias make adjustment ambiguous?</strong></li>
+</ol>
+<p>All examples use <strong>generated data</strong>. That is deliberate: the goal is to isolate the causal mechanism rather than to make a substantive claim about a real dataset.</p>
+<section id="learning-goals" class="level2">
+<h2 class="anchored" data-anchor-id="learning-goals">Learning goals</h2>
+<p>By the end of the lab, you should be able to:</p>
+<ul>
+<li>recognize a collider in a DAG;</li>
+<li>explain why conditioning on a collider opens a non-causal path;</li>
+<li>identify sample selection, attrition, and bad proxies as special cases of collider bias;</li>
+<li>understand why a pre-treatment variable can still be dangerous to control for;</li>
+<li>compare naive, selected, and adjusted estimators in simulated data.</li>
+</ul>
+</section>
+<section id="a-helper-function-for-model-summaries" class="level2">
+<h2 class="anchored" data-anchor-id="a-helper-function-for-model-summaries">A helper function for model summaries</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>extract_term <span class="ot">&lt;-</span> <span class="cf">function</span>(model, term) {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  s <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">summary</span>(model))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">term =</span> term,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">estimate =</span> <span class="fu">unname</span>(s[term, <span class="st">"Estimate"</span>]),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">std.error =</span> <span class="fu">unname</span>(s[term, <span class="st">"Std. Error"</span>])</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+</section>
+<section id="why-are-colliders-problematic" class="level1">
+<h1>1. Why are colliders problematic?</h1>
+<p>We start with a simple admissions-style collider:</p>
+<ul>
+<li><code>math</code> and <code>reading</code> are independent in the applicant pool;</li>
+<li>both increase the probability of being <code>admitted</code>;</li>
+<li>we then compare the full sample with the admitted-only sample.</li>
+</ul>
+<p>DAG:</p>
+<pre class="text"><code>math  -&gt; admitted &lt;- reading</code></pre>
+<section id="simulate-the-full-applicant-pool" class="level2">
+<h2 class="anchored" data-anchor-id="simulate-the-full-applicant-pool">1.1 Simulate the full applicant pool</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">5000</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>math <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>reading <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>admission_score <span class="ot">&lt;-</span> math <span class="sc">+</span> reading <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="fl">0.7</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>admitted <span class="ot">&lt;-</span> admission_score <span class="sc">&gt;</span> <span class="fu">quantile</span>(admission_score, <span class="fl">0.70</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>applicants <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">math =</span> math,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">reading =</span> reading,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">admitted =</span> admitted</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>applicants <span class="sc">%&gt;%</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">corr_full =</span> <span class="fu">cor</span>(math, reading),</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">corr_admitted =</span> <span class="fu">cor</span>(math[admitted], reading[admitted])</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Correlation before and after conditioning on the collider"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Correlation before and after conditioning on the collider</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;">corr_full</th>
+<th style="text-align: right;">corr_admitted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.035</td>
+<td style="text-align: right;">-0.407</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="visualize-the-induced-association" class="level2">
+<h2 class="anchored" data-anchor-id="visualize-the-induced-association">1.2 Visualize the induced association</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>plot_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  applicants <span class="sc">%&gt;%</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>      <span class="at">sample =</span> <span class="st">"Full applicant pool"</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">status =</span> <span class="fu">if_else</span>(admitted, <span class="st">"Admitted"</span>, <span class="st">"Not admitted"</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  applicants <span class="sc">%&gt;%</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(admitted) <span class="sc">%&gt;%</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">sample =</span> <span class="st">"Admitted only"</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">status =</span> <span class="st">"Admitted"</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_df, <span class="fu">aes</span>(<span class="at">x =</span> math, <span class="at">y =</span> reading, <span class="at">color =</span> status)) <span class="sc">+</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.25</span>) <span class="sc">+</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="fu">aes</span>(<span class="at">group =</span> <span class="dv">1</span>), <span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>, <span class="at">color =</span> <span class="st">"black"</span>) <span class="sc">+</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> sample) <span class="sc">+</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Admitted"</span> <span class="ot">=</span> <span class="st">"steelblue"</span>, <span class="st">"Not admitted"</span> <span class="ot">=</span> <span class="st">"tomato"</span>)) <span class="sc">+</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Conditioning on admission induces association"</span>,</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"The two skills are independent in the full pool but negatively related among admits"</span>,</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Math score"</span>,</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Reading/Writing score"</span>,</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">"Admission status"</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab7_files/figure-html/collider-warmup-plot-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="compare-a-naive-regression-across-samples" class="level2">
+<h2 class="anchored" data-anchor-id="compare-a-naive-regression-across-samples">1.3 Compare a naive regression across samples</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>model_full <span class="ot">&lt;-</span> <span class="fu">lm</span>(reading <span class="sc">~</span> math, <span class="at">data =</span> applicants)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>model_admitted <span class="ot">&lt;-</span> <span class="fu">lm</span>(reading <span class="sc">~</span> math, <span class="at">data =</span> <span class="fu">filter</span>(applicants, admitted))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(model_full, <span class="st">"math"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Full applicant pool"</span>),</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(model_admitted, <span class="st">"math"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Admitted only"</span>)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(model, estimate, std.error) <span class="sc">%&gt;%</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Regression slope for reading on math"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Regression slope for reading on math</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Full applicant pool</td>
+<td style="text-align: right;">0.034</td>
+<td style="text-align: right;">0.014</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Admitted only</td>
+<td style="text-align: right;">-0.402</td>
+<td style="text-align: right;">0.023</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="interpretation" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation">Interpretation</h3>
+<ul>
+<li>In the full pool, the slope should be near zero.</li>
+<li>Among admitted students, the slope becomes negative because <strong>admission is a collider</strong>.</li>
+<li>Nothing causal links math and reading here; the association is created by selection.</li>
+</ul>
+</section>
+<section id="reflection-questions" class="level3">
+<h3 class="anchored" data-anchor-id="reflection-questions">Reflection questions</h3>
+<ol type="1">
+<li>Why is the path between <code>math</code> and <code>reading</code> blocked in the full sample? Answer: the path is blocked because <code>math</code> and <code>reading</code> are independent in the applicant pool, and there is no causal path connecting them.</li>
+<li>What exactly changes when we analyze only admitted students? Answer: when we analyze only admitted students, we are conditioning on the collider <code>admitted</code>, which opens a non-causal path between <code>math</code> and <code>reading</code>.</li>
+<li>Why is the induced association negative rather than positive? Answer: the induced association is negative because, in the admitted sample, higher math scores are associated with lower reading scores (and vice versa), due to the selection mechanism.</li>
+</ol>
+</section>
+</section>
+</section>
+<section id="problems-that-are-just-collider-bias" class="level1">
+<h1>2. Problems that are just collider bias</h1>
+<p>This section turns the abstract collider into three applied problems:</p>
+<ol type="1">
+<li>sample selection / missing data;</li>
+<li>attrition;</li>
+<li>bad proxies.</li>
+</ol>
+<section id="sample-selection-missing-data-the-billboard-example" class="level2">
+<h2 class="anchored" data-anchor-id="sample-selection-missing-data-the-billboard-example">2.1 Sample selection / missing data: the Billboard example</h2>
+<p>The lecture uses a music example:</p>
+<ul>
+<li><code>popularity</code></li>
+<li><code>critical_rating</code></li>
+<li><code>on_billboard</code></li>
+</ul>
+<p>DAG:</p>
+<pre class="text"><code>popularity -&gt; on_billboard &lt;- critical_rating</code></pre>
+<p>The idea is simple: if we only analyze albums that make it onto the Billboard charts, then our dataset has already conditioned on a collider.</p>
+<section id="simulate-albums" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-albums">Simulate albums</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">8000</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>albums <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">popularity =</span> <span class="fu">as.numeric</span>(<span class="fu">scale</span>(<span class="fu">rnorm</span>(n))),</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">critical_rating =</span> <span class="fu">as.numeric</span>(<span class="fu">scale</span>(<span class="fu">rnorm</span>(n)))</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">billboard_score =</span> <span class="fl">0.9</span> <span class="sc">*</span> popularity <span class="sc">+</span> <span class="fl">0.9</span> <span class="sc">*</span> critical_rating <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="dv">1</span>),</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">on_billboard =</span> billboard_score <span class="sc">&gt;</span> <span class="fu">quantile</span>(billboard_score, <span class="fl">0.70</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>albums <span class="sc">%&gt;%</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">corr_full =</span> <span class="fu">cor</span>(popularity, critical_rating),</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">corr_billboard =</span> <span class="fu">cor</span>(popularity[on_billboard], critical_rating[on_billboard])</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Popularity and critical rating in the full population vs. charted albums"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Popularity and critical rating in the full population vs.&nbsp;charted albums</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;">corr_full</th>
+<th style="text-align: right;">corr_billboard</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">-0.007</td>
+<td style="text-align: right;">-0.286</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="plot-full-population-vs.-selected-sample" class="level3">
+<h3 class="anchored" data-anchor-id="plot-full-population-vs.-selected-sample">Plot full population vs.&nbsp;selected sample</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>plot_albums <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  albums <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      <span class="at">sample =</span> <span class="st">"All albums"</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">status =</span> <span class="fu">if_else</span>(on_billboard, <span class="st">"Billboard"</span>, <span class="st">"Not Billboard"</span>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  albums <span class="sc">%&gt;%</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(on_billboard) <span class="sc">%&gt;%</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">sample =</span> <span class="st">"Only Billboard albums"</span>,</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">status =</span> <span class="st">"Billboard"</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_albums, <span class="fu">aes</span>(<span class="at">x =</span> popularity, <span class="at">y =</span> critical_rating, <span class="at">color =</span> status)) <span class="sc">+</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.20</span>) <span class="sc">+</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="fu">aes</span>(<span class="at">group =</span> <span class="dv">1</span>), <span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">FALSE</span>, <span class="at">color =</span> <span class="st">"black"</span>) <span class="sc">+</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> sample) <span class="sc">+</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Billboard"</span> <span class="ot">=</span> <span class="st">"steelblue"</span>, <span class="st">"Not Billboard"</span> <span class="ot">=</span> <span class="st">"tomato"</span>)) <span class="sc">+</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Sample selection can create a false trade-off"</span>,</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Popularity"</span>,</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Critical rating"</span>,</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">"Album status"</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab7_files/figure-html/billboard-plot-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="compare-regression-slopes" class="level3">
+<h3 class="anchored" data-anchor-id="compare-regression-slopes">Compare regression slopes</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>billboard_full <span class="ot">&lt;-</span> <span class="fu">lm</span>(critical_rating <span class="sc">~</span> popularity, <span class="at">data =</span> albums)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>billboard_selected <span class="ot">&lt;-</span> <span class="fu">lm</span>(critical_rating <span class="sc">~</span> popularity, <span class="at">data =</span> <span class="fu">filter</span>(albums, on_billboard))</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(billboard_full, <span class="st">"popularity"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"All albums"</span>),</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(billboard_selected, <span class="st">"popularity"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Only Billboard albums"</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(model, estimate, std.error) <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Estimated relationship between popularity and critical rating"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Estimated relationship between popularity and critical rating</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">All albums</td>
+<td style="text-align: right;">-0.007</td>
+<td style="text-align: right;">0.011</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Only Billboard albums</td>
+<td style="text-align: right;">-0.288</td>
+<td style="text-align: right;">0.020</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="interpretation-1" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation-1">Interpretation</h3>
+<p>A selected sample can manufacture a relationship that is weak or absent in the full population. Here, popularity and critical acclaim look like substitutes only because we restricted the analysis to albums that passed through the selection process.</p>
+</section>
+<section id="questions" class="level3">
+<h3 class="anchored" data-anchor-id="questions">Questions</h3>
+<ol type="1">
+<li>In this example, where does the conditioning happen: in the regression, or in the dataset itself? Answer: the conditioning happens in the dataset itself, because we are only analyzing albums that made it onto the Billboard charts. The regression is then run on this already selected sample, which has induced a correlation between popularity and critical rating.</li>
+<li>What would happen if we only had Billboard albums and forgot about the selection process? Answer: if we only had Billboard albums and forgot about the selection process, we would incorrectly conclude that popularity and critical rating are negatively correlated, when in fact they are positively correlated in the full population.</li>
+</ol>
+</section>
+</section>
+<section id="attrition-bias" class="level2">
+<h2 class="anchored" data-anchor-id="attrition-bias">2.2 Attrition bias</h2>
+<p>Now we simulate an experiment or panel study where:</p>
+<ul>
+<li><code>D</code> = treatment;</li>
+<li><code>X</code> = a baseline risk factor;</li>
+<li><code>Y</code> = outcome;</li>
+<li><code>observed</code> = whether the respondent remains in the sample.</li>
+</ul>
+<p>We build attrition so that treatment and the risk factor both affect whether the outcome is observed.</p>
+<section id="simulate-attrition" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-attrition">Simulate attrition</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">10000</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>attrition_df <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">X =</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">D =</span> <span class="fu">rbinom</span>(n, <span class="at">size =</span> <span class="dv">1</span>, <span class="at">prob =</span> <span class="fl">0.5</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">Y =</span> <span class="dv">2</span> <span class="sc">*</span> D <span class="sc">+</span> <span class="fl">1.5</span> <span class="sc">*</span> X <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">p_dropout =</span> <span class="fu">plogis</span>(<span class="sc">-</span><span class="fl">0.5</span> <span class="sc">+</span> <span class="fl">0.9</span> <span class="sc">*</span> D <span class="sc">+</span> <span class="fl">0.9</span> <span class="sc">*</span> X),</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">dropout =</span> <span class="fu">rbinom</span>(n, <span class="at">size =</span> <span class="dv">1</span>, <span class="at">prob =</span> p_dropout),</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">observed =</span> <span class="dv">1</span> <span class="sc">-</span> dropout</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>attrition_df <span class="sc">%&gt;%</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">retention_rate =</span> <span class="fu">mean</span>(observed),</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">retention_control =</span> <span class="fu">mean</span>(observed[D <span class="sc">==</span> <span class="dv">0</span>]),</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">retention_treated =</span> <span class="fu">mean</span>(observed[D <span class="sc">==</span> <span class="dv">1</span>])</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Retention rates"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Retention rates</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;">retention_rate</th>
+<th style="text-align: right;">retention_control</th>
+<th style="text-align: right;">retention_treated</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.516</td>
+<td style="text-align: right;">0.609</td>
+<td style="text-align: right;">0.42</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="estimate-the-treatment-effect-under-different-decisions" class="level3">
+<h3 class="anchored" data-anchor-id="estimate-the-treatment-effect-under-different-decisions">Estimate the treatment effect under different decisions</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>true_tau <span class="ot">&lt;-</span> <span class="dv">2</span> <span class="co"># The true effect of D on Y in the data-generating process, computed from the simulation code above (Y = 2 * D + 1.5 * X + noise)</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>m_full <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D, <span class="at">data =</span> attrition_df)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>m_cc_naive <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D, <span class="at">data =</span> <span class="fu">filter</span>(attrition_df, observed <span class="sc">==</span> <span class="dv">1</span>))</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>m_cc_adjusted <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D <span class="sc">+</span> X, <span class="at">data =</span> <span class="fu">filter</span>(attrition_df, observed <span class="sc">==</span> <span class="dv">1</span>))</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_full, <span class="st">"D"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Full sample (no attrition problem)"</span>, <span class="at">true_effect =</span> true_tau),</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_cc_naive, <span class="st">"D"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Observed cases only"</span>, <span class="at">true_effect =</span> true_tau),</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_cc_adjusted, <span class="st">"D"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Observed cases + adjust for X"</span>, <span class="at">true_effect =</span> true_tau)</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bias =</span> estimate <span class="sc">-</span> true_effect) <span class="sc">%&gt;%</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(model, estimate, std.error, true_effect, bias) <span class="sc">%&gt;%</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Attrition can open a collider path"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Attrition can open a collider path</caption>
+<colgroup>
+<col style="width: 47%">
+<col style="width: 12%">
+<col style="width: 13%">
+<col style="width: 16%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+<th style="text-align: right;">true_effect</th>
+<th style="text-align: right;">bias</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Full sample (no attrition problem)</td>
+<td style="text-align: right;">1.938</td>
+<td style="text-align: right;">0.036</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">-0.062</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Observed cases only</td>
+<td style="text-align: right;">1.711</td>
+<td style="text-align: right;">0.048</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">-0.289</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Observed cases + adjust for X</td>
+<td style="text-align: right;">1.988</td>
+<td style="text-align: right;">0.028</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">-0.012</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="interpretation-2" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation-2">Interpretation</h3>
+<ul>
+<li>In the full sample, randomization keeps <code>D</code> independent of <code>X</code>, so the estimate is close to the true effect.</li>
+<li>Among observed cases only, selection opens the path <code>D -&gt; observed &lt;- X -&gt; Y</code>, which creates bias.</li>
+<li>If <code>X</code> is observed and we control for it, we can block that path again.</li>
+</ul>
+</section>
+<section id="questions-1" class="level3">
+<h3 class="anchored" data-anchor-id="questions-1">Questions</h3>
+<ol type="1">
+<li>Why is attrition not automatically a problem in every study? Answer: attrition is only a problem if it is related to both the treatment and the outcome (through the confounder <code>X</code>), which creates a collider structure. If attrition were random or only related to one of those factors, it would not necessarily bias the estimate.</li>
+<li>In this simulation, what makes attrition informative rather than harmless? Answer: attrition is informative because it depends on both the treatment (<code>D</code>) and the baseline risk factor (<code>X</code>), which also affects the outcome (<code>Y</code>). This creates a collider structure where conditioning on being observed opens a non-causal path between <code>D</code> and <code>Y</code> through <code>X</code>.</li>
+<li>Why does adjusting for <code>X</code> help here? Answer: adjusting for <code>X</code> helps because it blocks the non-causal path that was opened by conditioning on being observed. By controlling for <code>X</code>, we can isolate the direct effect of <code>D</code> on <code>Y</code> without the bias introduced by the collider structure.</li>
+</ol>
+</section>
+</section>
+<section id="bad-proxies" class="level2">
+<h2 class="anchored" data-anchor-id="bad-proxies">2.3 Bad proxies</h2>
+<p>The lecture uses this example:</p>
+<ul>
+<li><code>S</code> = schooling;</li>
+<li><code>W</code> = wages;</li>
+<li><code>U</code> = ability (unobserved);</li>
+<li><code>T</code> = later test score.</li>
+</ul>
+<p>The bad proxy problem arises because <code>T</code> is affected by both schooling and ability.</p>
+<p>To make the contrast clearer, we also create a <strong>good proxy</strong>:</p>
+<ul>
+<li><code>Q_pre</code> = an early test score that is affected by ability but not by later schooling.</li>
+</ul>
+<section id="simulate-a-good-and-a-bad-proxy" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-a-good-and-a-bad-proxy">Simulate a good and a bad proxy</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">12000</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>proxy_df <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">U =</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">S =</span> <span class="fl">0.8</span> <span class="sc">*</span> U <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">W =</span> <span class="fl">1.0</span> <span class="sc">*</span> S <span class="sc">+</span> <span class="fl">1.2</span> <span class="sc">*</span> U <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">Q_pre =</span> <span class="fl">1.0</span> <span class="sc">*</span> U <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">T_post =</span> <span class="fl">1.5</span> <span class="sc">*</span> S <span class="sc">+</span> <span class="fl">1.5</span> <span class="sc">*</span> U <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="fl">0.6</span>)</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="compare-estimators" class="level3">
+<h3 class="anchored" data-anchor-id="compare-estimators">Compare estimators</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>true_tau <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>m_naive <span class="ot">&lt;-</span> <span class="fu">lm</span>(W <span class="sc">~</span> S, <span class="at">data =</span> proxy_df)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>m_oracle <span class="ot">&lt;-</span> <span class="fu">lm</span>(W <span class="sc">~</span> S <span class="sc">+</span> U, <span class="at">data =</span> proxy_df)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>m_good_proxy <span class="ot">&lt;-</span> <span class="fu">lm</span>(W <span class="sc">~</span> S <span class="sc">+</span> Q_pre, <span class="at">data =</span> proxy_df)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>m_bad_proxy <span class="ot">&lt;-</span> <span class="fu">lm</span>(W <span class="sc">~</span> S <span class="sc">+</span> T_post, <span class="at">data =</span> proxy_df)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_naive, <span class="st">"S"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Naive: no controls"</span>, <span class="at">true_effect =</span> true_tau),</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_oracle, <span class="st">"S"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Oracle: control for true ability U"</span>, <span class="at">true_effect =</span> true_tau),</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_good_proxy, <span class="st">"S"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Good proxy: early test Q_pre"</span>, <span class="at">true_effect =</span> true_tau),</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_bad_proxy, <span class="st">"S"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Bad proxy: later test T_post"</span>, <span class="at">true_effect =</span> true_tau)</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bias =</span> estimate <span class="sc">-</span> true_effect) <span class="sc">%&gt;%</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(model, estimate, std.error, true_effect, bias) <span class="sc">%&gt;%</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Good and bad proxies do very different things"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Good and bad proxies do very different things</caption>
+<colgroup>
+<col style="width: 47%">
+<col style="width: 12%">
+<col style="width: 13%">
+<col style="width: 16%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+<th style="text-align: right;">true_effect</th>
+<th style="text-align: right;">bias</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Naive: no controls</td>
+<td style="text-align: right;">1.577</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.577</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Oracle: control for true ability U</td>
+<td style="text-align: right;">0.989</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.011</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Good proxy: early test Q_pre</td>
+<td style="text-align: right;">1.355</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.355</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Bad proxy: later test T_post</td>
+<td style="text-align: right;">0.160</td>
+<td style="text-align: right;">0.019</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.840</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="interpretation-3" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation-3">Interpretation</h3>
+<ul>
+<li>The naive model is biased because ability confounds schooling and wages.</li>
+<li>The oracle model recovers the true effect because it conditions on the real confounder.</li>
+<li>The good proxy reduces bias because it captures part of ability.</li>
+<li>The bad proxy can create collider bias because <code>T_post</code> is itself caused by both schooling and ability.</li>
+</ul>
+</section>
+<section id="questions-2" class="level3">
+<h3 class="anchored" data-anchor-id="questions-2">Questions</h3>
+<ol type="1">
+<li>Why is <code>Q_pre</code> a better control than <code>T_post</code>? Answer: <code>Q_pre</code> is a better control because it is only affected by the unobserved ability <code>U</code> and not by the treatment <code>S</code>. This means that controlling for <code>Q_pre</code> helps to block the confounding path without introducing collider bias. In contrast, <code>T_post</code> is affected by both <code>S</code> and <code>U</code>, so controlling for it opens a non-causal path between <code>S</code> and <code>W</code> through <code>T_post</code>, which can bias the estimate.</li>
+<li>What path is opened when we condition on <code>T_post</code>? Answer: When we condition on <code>T_post</code>, we open a non-causal path between <code>S</code> and <code>W</code> through <code>T_post</code>.</li>
+<li>Why is “proxy” not a purely statistical label, but a causal one? Answer: “Proxy” is not a purely statistical label but a causal one because it refers to a variable that is used to represent or substitute for a causal factor (like ability) that is not directly observable. The effectiveness of a proxy in reducing bias depends on its causal relationship with the treatment and outcome variables, not just its correlation with the unobserved confounder.</li>
+</ol>
+</section>
+</section>
+</section>
+<section id="m-bias" class="level1">
+<h1>3. M-bias</h1>
+<p>We will do this in two steps:</p>
+<ol type="1">
+<li>a <strong>pure M-bias</strong> example, where adjustment creates bias;</li>
+<li>a <strong>trade-off</strong> example, inspired by the Ding &amp; Miratrix discussion, where adjustment can reduce one bias while creating another.</li>
+</ol>
+<section id="pure-m-bias" class="level2">
+<h2 class="anchored" data-anchor-id="pure-m-bias">3.1 Pure M-bias</h2>
+<p>In the pure version, the true causal effect of <code>D</code> on <code>Y</code> is 3.</p>
+<p>DAG:</p>
+<p>If we do <strong>not</strong> condition on <code>X</code>, the path between <code>D</code> and <code>Y</code> is blocked at the collider. If we <strong>do</strong> condition on <code>X</code>, we open the path <code>D &lt;- U1 -&gt; X &lt;- U2 -&gt; Y</code>.</p>
+<section id="simulate-pure-m-bias" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-pure-m-bias">Simulate pure M-bias</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">50000</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>m_df <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">U1 =</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">U2 =</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">X =</span> <span class="fl">1.2</span> <span class="sc">*</span> U1 <span class="sc">+</span> <span class="fl">1.2</span> <span class="sc">*</span> U2 <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">D =</span> <span class="fl">1.0</span> <span class="sc">*</span> U1 <span class="sc">+</span> <span class="fu">rnorm</span>(n),</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">Y =</span> <span class="dv">3</span> <span class="sc">*</span> D <span class="sc">+</span> <span class="fl">1.0</span> <span class="sc">*</span> U2 <span class="sc">+</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>m_unadjusted <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D, <span class="at">data =</span> m_df)</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>m_adjusted <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D <span class="sc">+</span> X, <span class="at">data =</span> m_df)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="fu">bind_rows</span>(</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_unadjusted, <span class="st">"D"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Unadjusted"</span>, <span class="at">true_effect =</span> <span class="dv">3</span>),</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">extract_term</span>(m_adjusted, <span class="st">"D"</span>) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"Adjusted for X"</span>, <span class="at">true_effect =</span> <span class="dv">3</span>)</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bias =</span> estimate <span class="sc">-</span> true_effect) <span class="sc">%&gt;%</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(model, estimate, std.error, true_effect, bias) <span class="sc">%&gt;%</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"Pure M-bias: controlling for X can create bias"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Pure M-bias: controlling for X can create bias</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">std.error</th>
+<th style="text-align: right;">true_effect</th>
+<th style="text-align: right;">bias</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">3.004</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">2.774</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">-0.226</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="interpretation-4" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation-4">Interpretation</h3>
+<p>This is the cleanest demonstration of the danger:</p>
+<ul>
+<li>without adjustment, the treatment effect estimate is close to zero;</li>
+<li>after conditioning on <code>X</code>, a non-causal path opens and the estimate moves away from zero.</li>
+</ul>
+</section>
+</section>
+<section id="a-ding-miratrix-inspired-trade-off-simulation" class="level2">
+<h2 class="anchored" data-anchor-id="a-ding-miratrix-inspired-trade-off-simulation">3.2 A Ding &amp; Miratrix-inspired trade-off simulation</h2>
+<p>The lecture cites Ding &amp; Miratrix when asking whether conditioning on <code>X</code> makes sense. The point is not that adjustment is always wrong, but that it can involve a <strong>trade-off</strong>.</p>
+<p>We simulate a setting in which <code>X</code> plays two roles at once:</p>
+<ul>
+<li>it is a confounder-like variable because it affects both <code>D</code> and <code>Y</code>;</li>
+<li>it is also a collider because it is caused by <code>U1</code> and <code>U2</code>.</li>
+</ul>
+<p>DAG:</p>
+<section id="a-function-to-study-the-trade-off" class="level3">
+<h3 class="anchored" data-anchor-id="a-function-to-study-the-trade-off">A function to study the trade-off</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>simulate_tradeoff <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">n =</span> <span class="dv">30000</span>,</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>                              <span class="at">m_strength =</span> <span class="fl">0.0</span>, <span class="co"># strength of the collider structure (U1, U2 -&gt; X)</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>                              <span class="at">beta_x =</span> <span class="fl">0.7</span>, <span class="co"># strength of the confounding structure (X -&gt; D and X -&gt; Y)     </span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>                              <span class="at">alpha_x =</span> <span class="fl">0.7</span>, <span class="co"># </span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>                              <span class="at">tau =</span> <span class="fl">1.0</span>) {</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>  U1 <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  U2 <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> m_strength <span class="sc">*</span> U1 <span class="sc">+</span> m_strength <span class="sc">*</span> U2 <span class="sc">+</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  D <span class="ot">&lt;-</span> beta_x <span class="sc">*</span> X <span class="sc">+</span> <span class="fl">0.8</span> <span class="sc">*</span> U1 <span class="sc">+</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  Y <span class="ot">&lt;-</span> tau <span class="sc">*</span> D <span class="sc">+</span> alpha_x <span class="sc">*</span> X <span class="sc">+</span> <span class="fl">0.8</span> <span class="sc">*</span> U2 <span class="sc">+</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>  est_unadjusted <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">lm</span>(Y <span class="sc">~</span> D))[<span class="st">"D"</span>]</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  est_adjusted <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">lm</span>(Y <span class="sc">~</span> D <span class="sc">+</span> X))[<span class="st">"D"</span>]</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">m_strength =</span> m_strength,</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">model =</span> <span class="fu">c</span>(<span class="st">"Unadjusted"</span>, <span class="st">"Adjusted for X"</span>),</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">estimate =</span> <span class="fu">c</span>(est_unadjusted, est_adjusted),</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">true_effect =</span> tau,</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">bias =</span> estimate <span class="sc">-</span> true_effect</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="run-the-sensitivity-exercise" class="level3">
+<h3 class="anchored" data-anchor-id="run-the-sensitivity-exercise">Run the sensitivity exercise</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>grid_vals <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="dv">0</span>, <span class="fl">1.2</span>, <span class="at">by =</span> <span class="fl">0.1</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>tradeoff_results <span class="ot">&lt;-</span> <span class="fu">map_dfr</span>(grid_vals, <span class="sc">~</span> <span class="fu">simulate_tradeoff</span>(<span class="at">beta_x =</span> <span class="dv">7</span>, <span class="at">alpha_x =</span> <span class="fl">0.7</span>, <span class="at">tau =</span> <span class="dv">1</span>, <span class="at">m_strength =</span> .x))</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>tradeoff_results <span class="sc">%&gt;%</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>, <span class="at">caption =</span> <span class="st">"First rows of the trade-off simulation results"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>First rows of the trade-off simulation results</caption>
+<thead>
+<tr class="header">
+<th style="text-align: right;">m_strength</th>
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: right;">true_effect</th>
+<th style="text-align: right;">bias</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.0</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.096</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.096</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.0</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">1.001</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.1</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.106</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.106</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.1</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">1.006</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.006</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.2</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.115</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.115</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.2</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.986</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.014</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.3</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.121</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.121</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.3</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.964</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.036</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.4</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.127</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.127</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.4</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.943</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.057</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.5</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.130</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.130</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.5</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.927</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.073</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.6</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.131</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.131</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.6</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.905</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.095</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.7</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.133</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.133</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.7</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.891</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.109</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.8</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.132</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.132</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.8</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.882</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.118</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">0.9</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.131</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.131</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">0.9</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.860</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.140</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1.0</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.131</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.131</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1.0</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.845</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.155</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1.1</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.130</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.130</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1.1</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.842</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.158</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1.2</td>
+<td style="text-align: left;">Unadjusted</td>
+<td style="text-align: right;">1.128</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.128</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1.2</td>
+<td style="text-align: left;">Adjusted for X</td>
+<td style="text-align: right;">0.815</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">-0.185</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="plot-the-bias-of-the-adjusted-and-unadjusted-estimators" class="level3">
+<h3 class="anchored" data-anchor-id="plot-the-bias-of-the-adjusted-and-unadjusted-estimators">Plot the bias of the adjusted and unadjusted estimators</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(tradeoff_results, <span class="fu">aes</span>(<span class="at">x =</span> m_strength, <span class="at">y =</span> bias, <span class="at">color =</span> model)) <span class="sc">+</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">linewidth =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Adjustment can help or hurt depending on the strength of the collider structure"</span>,</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"A simple sensitivity exercise inspired by the M-bias / butterfly-bias trade-off"</span>,</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Strength of U1, U2 -&gt; X"</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Bias in the estimated effect of D on Y"</span>,</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="cn">NULL</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab7_files/figure-html/tradeoff-plot-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="interpretation-5" class="level3">
+<h3 class="anchored" data-anchor-id="interpretation-5">Interpretation</h3>
+<ul>
+<li>Collider structure means that adjusting for <code>X</code> can create bias, and the strength of the collider structure depends on how strongly <code>U1</code> and <code>U2</code> affect <code>X</code>.</li>
+<li>When the collider structure is weak, adjusting for <code>X</code> may help because it blocks confounding through <code>X</code>.</li>
+<li>As the collider structure gets stronger, adjusting for <code>X</code> opens a more important non-causal path.</li>
+<li>There is no automatic rule that says “always adjust” or “never adjust”. It depends on the specific causal structure (the functional form) and the relative strength of the confounding and collider paths.</li>
+<li>IN THIS EXAMPLE: When beta_x is large and as m_strength increases, the bias from adjusting for X can become larger than the bias from not adjusting, which is why the adjusted estimator can perform worse than the unadjusted one in some cases.</li>
+<li>IN THIS EXAMPLE: When alpha_x ### Questions</li>
+</ul>
+<ol type="1">
+<li>Why does the relative performance of the adjusted estimator change as <code>m_strength</code> increases? Answer: as <code>m_strength</code> increases, the collider bias from adjusting for <code>X</code> becomes stronger, while the confounding bias from not adjusting for <code>X</code> may not change as much.</li>
+<li>What exactly is the trade-off in this simulation? Answer: the trade-off is between reducing confounding bias by adjusting for <code>X</code> and introducing collider bias by adjusting for <code>X</code>.</li>
+<li>How does this section change the rule of thumb “control for all pre-treatment variables”? Answer: it shows that the rule of thumb is not universally valid, and that we need to consider the full DAG and the specific causal structure of the problem before deciding whether to adjust for a variable.</li>
+</ol>
+</section>
+</section>
+</section>
+<section id="wrap-up" class="level1">
+<h1>4. Wrap-up</h1>
+<p>This lab showed three increasingly demanding lessons:</p>
+<ol type="1">
+<li><strong>Collider conditioning creates association</strong> even when no causal path exists.</li>
+<li><strong>Sample selection, attrition, and bad proxies</strong> are often just collider bias under different names.</li>
+<li><strong>M-bias</strong> shows why covariate adjustment must be guided by the full DAG, not by a mechanical rule.</li>
+</ol>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

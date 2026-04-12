@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="">
+<meta name="dcterms.date" content="2026-04-08">
+
+<title>Lab 8: Principal Stratification and Instrumental Variables</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="lab8_files/libs/clipboard/clipboard.min.js"></script>
+<script src="lab8_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="lab8_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="lab8_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="lab8_files/libs/quarto-html/popper.min.js"></script>
+<script src="lab8_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="lab8_files/libs/quarto-html/anchor.min.js"></script>
+<link href="lab8_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="lab8_files/libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="lab8_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="lab8_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="lab8_files/libs/bootstrap/bootstrap-d6a003b94517c951b2d65075d42fb01b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 8: Principal Stratification and Instrumental Variables</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 8, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="learning-objectives" class="level1">
+<h1>Learning objectives</h1>
+<p>By the end of this lab, you should be able to:</p>
+<ol type="1">
+<li>Distinguish <strong>assignment</strong> from <strong>treatment uptake</strong> in a randomized encouragement design.</li>
+<li>Define the principal strata: <strong>compliers, never-takers, always-takers, and defiers</strong>.</li>
+<li>Estimate and interpret the <strong>first stage</strong>, <strong>reduced form</strong>, <strong>Wald estimator</strong>, and <strong>2SLS estimate</strong>.</li>
+<li>Explain why the IV estimate identifies a <strong>local</strong> causal effect rather than the ATE for everyone.</li>
+<li>Reflect on the assumptions behind IV and principal stratification in a real political science application.</li>
+</ol>
+</section>
+<section id="the-empirical-case" class="level1">
+<h1>The empirical case</h1>
+<p>This lab is based on <strong>Albertson &amp; Lawrence (2009)</strong>, who studied whether exposure to an educational television debate affected political attitudes and knowledge around <strong>California Proposition 209</strong>.</p>
+<p>The key feature of the design is that respondents were <strong>randomly encouraged</strong> to watch a Fox debate on affirmative action, but not everyone who received encouragement actually watched. This creates a classic setting with:</p>
+<ul>
+<li>an <strong>instrument</strong>: encouragement to watch the debate,</li>
+<li>an <strong>endogenous treatment</strong>: actually watching the debate,</li>
+<li>outcomes related to political attitudes and information.</li>
+</ul>
+<p>That is why this paper is a good bridge between <strong>instrumental variables</strong> and <strong>principal stratification</strong>.</p>
+<section id="main-variables-in-this-lab" class="level2">
+<h2 class="anchored" data-anchor-id="main-variables-in-this-lab">Main variables in this lab</h2>
+<ul>
+<li><code>conditn</code>: randomized encouragement to watch the debate (instrument, (Z))</li>
+<li><code>watchpro</code>: actually watched the debate (treatment, (D))</li>
+<li><code>support</code>: support for Proposition 209 (main outcome, (Y))</li>
+<li><code>infopro</code>: how informed respondents felt about Proposition 209 (extension outcome)</li>
+</ul>
+</section>
+</section>
+<section id="packages-and-data" class="level1">
+<h1>Packages and data</h1>
+<section id="install-packages-if-needed" class="level2">
+<h2 class="anchored" data-anchor-id="install-packages-if-needed">Install packages if needed</h2>
+<p>Run this once if you do not yet have the packages installed.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">"ivdesc"</span>, <span class="st">"ivreg"</span>, <span class="st">"dplyr"</span>, <span class="st">"ggplot2"</span>, <span class="st">"knitr"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="load-packages-and-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-packages-and-data">Load packages and data</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ivdesc)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ivreg)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(knitr)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(<span class="st">"FoxDebate"</span>, <span class="at">package =</span> <span class="st">"ivdesc"</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>fd <span class="ot">&lt;-</span> FoxDebate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+</section>
+<section id="causal-setup-noncompliance-and-principal-strata" class="level1">
+<h1>Causal setup: noncompliance and principal strata</h1>
+<p>Let:</p>
+<ul>
+<li>(Z_i) be encouragement assignment,</li>
+<li>(D_i) be actual viewing,</li>
+<li>(Y_i) be the outcome of interest.</li>
+</ul>
+<p>Because not everyone complies with assignment, each unit can be thought of as belonging to a <strong>principal stratum</strong> defined by the pair ((D_i(1), D_i(0))):</p>
+<ul>
+<li><strong>Compliers</strong>: (D_i(1)=1), (D_i(0)=0)</li>
+<li><strong>Always-takers</strong>: (D_i(1)=1), (D_i(0)=1)</li>
+<li><strong>Never-takers</strong>: (D_i(1)=0), (D_i(0)=0)</li>
+<li><strong>Defiers</strong>: (D_i(1)=0), (D_i(0)=1)</li>
+</ul>
+<p>These groups are <strong>not directly observed</strong>. Principal stratification gives us the language to describe them, while IV gives us a way to estimate a causal effect for one of them: the <strong>compliers</strong>.</p>
+<section id="pair-discussion" class="level2">
+<h2 class="anchored" data-anchor-id="pair-discussion">Pair discussion</h2>
+<ul>
+<li>In one or two sentences, explain why comparing people who watched the debate to people who did not watch it is <strong>not automatically causal</strong>.</li>
+<li>Compare your answers with a partner. What kinds of people might choose to watch the debate even without encouragement?</li>
+</ul>
+</section>
+</section>
+<section id="descriptive-analysis" class="level1">
+<h1>Descriptive analysis</h1>
+<section id="assignment-and-uptake" class="level2">
+<h2 class="anchored" data-anchor-id="assignment-and-uptake">Assignment and uptake</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>assignment_uptake <span class="ot">&lt;-</span> fd <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">n =</span> <span class="fu">n</span>(),</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">encouraged_rate =</span> <span class="fu">mean</span>(conditn, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">watched_rate =</span> <span class="fu">mean</span>(watchpro, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(assignment_uptake, <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">n</th>
+<th style="text-align: right;">encouraged_rate</th>
+<th style="text-align: right;">watched_rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">507</td>
+<td style="text-align: right;">0.511</td>
+<td style="text-align: right;">0.252</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>uptake_by_assignment <span class="ot">&lt;-</span> fd <span class="sc">%&gt;%</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(conditn) <span class="sc">%&gt;%</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">n =</span> <span class="fu">n</span>(),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">watch_rate =</span> <span class="fu">mean</span>(watchpro, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">encouragement =</span> <span class="fu">ifelse</span>(conditn <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Encouraged"</span>, <span class="st">"Not encouraged"</span>))</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(uptake_by_assignment, <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">conditn</th>
+<th style="text-align: right;">n</th>
+<th style="text-align: right;">watch_rate</th>
+<th style="text-align: left;">encouragement</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">248</td>
+<td style="text-align: right;">0.044</td>
+<td style="text-align: left;">Not encouraged</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">259</td>
+<td style="text-align: right;">0.452</td>
+<td style="text-align: left;">Encouraged</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(uptake_by_assignment, <span class="fu">aes</span>(<span class="at">x =</span> encouragement, <span class="at">y =</span> watch_rate)) <span class="sc">+</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">width =</span> <span class="fl">0.6</span>) <span class="sc">+</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Watching the debate by encouragement status"</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Proportion who watched"</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ylim</span>(<span class="dv">0</span>, <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab8_files/figure-html/plot-first-stage-descriptive-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="outcome-summaries" class="level2">
+<h2 class="anchored" data-anchor-id="outcome-summaries">Outcome summaries</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fd <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_support =</span> <span class="fu">mean</span>(support, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_infopro =</span> <span class="fu">mean</span>(infopro, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">mean_support</th>
+<th style="text-align: right;">mean_infopro</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0.653</td>
+<td style="text-align: right;">3.233</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>fd <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(conditn) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mean_support =</span> <span class="fu">mean</span>(support, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">encouragement =</span> <span class="fu">ifelse</span>(conditn <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Encouraged"</span>, <span class="st">"Not encouraged"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">conditn</th>
+<th style="text-align: right;">mean_support</th>
+<th style="text-align: left;">encouragement</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.656</td>
+<td style="text-align: left;">Not encouraged</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.651</td>
+<td style="text-align: left;">Encouraged</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>fd <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(watchpro) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mean_support =</span> <span class="fu">mean</span>(support, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">watched =</span> <span class="fu">ifelse</span>(watchpro <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Watched"</span>, <span class="st">"Did not watch"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable</span>(<span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">watchpro</th>
+<th style="text-align: right;">mean_support</th>
+<th style="text-align: left;">watched</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.678</td>
+<td style="text-align: left;">Did not watch</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.587</td>
+<td style="text-align: left;">Watched</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="quick-interpretation" class="level2">
+<h2 class="anchored" data-anchor-id="quick-interpretation">Quick interpretation</h2>
+<ul>
+<li>Look at the difference in average support by <code>watchpro</code> and by <code>conditn</code>. Which comparison looks more causal, and why?</li>
+<li>Why is the comparison by <code>watchpro</code> likely biased? What does the comparison by <code>conditn</code> give us?</li>
+</ul>
+</section>
+</section>
+<section id="step-1-the-first-stage" class="level1">
+<h1>Step 1: The first stage</h1>
+<p>The <strong>first stage</strong> asks whether encouragement changed actual viewing.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>m_first <span class="ot">&lt;-</span> <span class="fu">lm</span>(watchpro <span class="sc">~</span> conditn, <span class="at">data =</span> fd)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_first)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = watchpro ~ conditn, data = fd)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.45174 -0.45174 -0.04435  0.54826  0.95565 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  0.04435    0.02442   1.817   0.0699 .  
+conditn      0.40738    0.03416  11.926   &lt;2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.3845 on 505 degrees of freedom
+Multiple R-squared:  0.2197,    Adjusted R-squared:  0.2182 
+F-statistic: 142.2 on 1 and 505 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<p>The coefficient on <code>conditn</code> is the causal effect of encouragement on the probability of actually watching the debate.</p>
+<p>Under the IV assumptions, this quantity is also closely related to the share of <strong>compliers</strong> in the sample.</p>
+<ul>
+<li>Now, interpret the coefficient on <code>conditn</code> from the first-stage model in plain language.</li>
+</ul>
+<p>Use the following sentence starter:</p>
+<blockquote class="blockquote">
+<p>Being assigned to encouragement changes the probability of watching the debate by approximately <code>___</code> percentage points.</p>
+</blockquote>
+</section>
+<section id="step-2-the-reduced-form-itt" class="level1">
+<h1>Step 2: The reduced form / ITT</h1>
+<p>The <strong>reduced form</strong> estimates the effect of the instrument on the outcome.</p>
+<p>We begin with <code>support</code> as the main outcome.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>m_rf_support <span class="ot">&lt;-</span> <span class="fu">lm</span>(support <span class="sc">~</span> conditn, <span class="at">data =</span> fd)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_rf_support)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = support ~ conditn, data = fd)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.6557 -0.6507  0.3443  0.3493  0.3493 
+
+Coefficients:
+             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  0.655660   0.032765   20.01   &lt;2e-16 ***
+conditn     -0.005005   0.045469   -0.11    0.912    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.4771 on 439 degrees of freedom
+  (66 observations deleted due to missingness)
+Multiple R-squared:  2.76e-05,  Adjusted R-squared:  -0.00225 
+F-statistic: 0.01212 on 1 and 439 DF,  p-value: 0.9124</code></pre>
+</div>
+</div>
+<p>This is the <strong>intention-to-treat (ITT)</strong> effect of encouragement on support for Proposition 209. The coefficient on <code>conditn</code> captures how much support changes when people are encouraged to watch, regardless of whether they actually watch.</p>
+<section id="discussion-itt" class="level2">
+<h2 class="anchored" data-anchor-id="discussion-itt">Discussion ITT</h2>
+<p>If encouragement affects the outcome only through viewing the debate, why might the ITT effect be smaller in magnitude than the effect of actually viewing?</p>
+</section>
+</section>
+<section id="step-3-the-wald-estimator-by-hand" class="level1">
+<h1>Step 3: The Wald estimator by hand</h1>
+<p>For a binary instrument and binary treatment, the simple Wald estimator is:</p>
+<p>LATE = (E[Y | Z=1] - E[Y | Z=0]) / (E[D | Z=1] - E[D | Z=0])</p>
+<p>It can be thought as the effect of encouragement on the outcome (the reduced form) scaled by how much encouragement changes treatment uptake (the first stage).</p>
+<p>In regression language, it is the <strong>reduced-form coefficient</strong> divided by the <strong>first-stage coefficient</strong>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>wald_support <span class="ot">&lt;-</span> <span class="fu">coef</span>(m_rf_support)[<span class="st">"conditn"</span>] <span class="sc">/</span> <span class="fu">coef</span>(m_first)[<span class="st">"conditn"</span>]</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>wald_support</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>    conditn 
+-0.01228662 </code></pre>
+</div>
+</div>
+<p>Interpretation of the Wald estimate: &gt; The Local Average Treatment Effect (LATE) of watching the debate on support for Proposition 209 is approximately -1.2 percentage points. This means that for the subgroup of compliers, who watched the debate because they were encouraged, watching the debate caused a change in support of -1.2 percentage points.</p>
+<section id="example-for-the-extension-outcome-infopro" class="level2">
+<h2 class="anchored" data-anchor-id="example-for-the-extension-outcome-infopro">Example for the extension outcome (<code>infopro</code>)</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>m_rf_info <span class="ot">&lt;-</span> <span class="fu">lm</span>(infopro <span class="sc">~</span> conditn, <span class="at">data =</span> fd)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>m_first_info <span class="ot">&lt;-</span> <span class="fu">lm</span>(watchpro <span class="sc">~</span> conditn, <span class="at">data =</span> fd)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>wald_info <span class="ot">&lt;-</span> <span class="fu">coef</span>(m_rf_info)[<span class="st">"conditn"</span>] <span class="sc">/</span> <span class="fu">coef</span>(m_first_info)[<span class="st">"conditn"</span>]</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>wald_info</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  conditn 
+0.2380046 </code></pre>
+</div>
+</div>
+</section>
+<section id="wald-estimation-discussion" class="level2">
+<h2 class="anchored" data-anchor-id="wald-estimation-discussion">Wald estimation discussion</h2>
+<ul>
+<li>Why does dividing the reduced form by the first stage recover an effect for compliers rather than for everybody?</li>
+</ul>
+</section>
+</section>
+<section id="step-4-naive-ols-vs-iv" class="level1">
+<h1>Step 4: Naive OLS vs IV</h1>
+<p>A naive regression compares people who watched the debate to people who did not.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>m_ols_support <span class="ot">&lt;-</span> <span class="fu">lm</span>(support <span class="sc">~</span> watchpro, <span class="at">data =</span> fd)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_ols_support)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = support ~ watchpro, data = fd)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.6781 -0.5868  0.3219  0.3219  0.4132 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  0.67812    0.02657  25.521   &lt;2e-16 ***
+watchpro    -0.09135    0.05073  -1.801   0.0724 .  
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.4753 on 439 degrees of freedom
+  (66 observations deleted due to missingness)
+Multiple R-squared:  0.007332,  Adjusted R-squared:  0.005071 
+F-statistic: 3.243 on 1 and 439 DF,  p-value: 0.07243</code></pre>
+</div>
+</div>
+<p>Now estimate the IV model using <code>conditn</code> as an instrument for <code>watchpro</code>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>m_iv_support <span class="ot">&lt;-</span> <span class="fu">ivreg</span>(support <span class="sc">~</span> watchpro <span class="sc">|</span> conditn, <span class="at">data =</span> fd)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_iv_support, <span class="at">diagnostics =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ivreg(formula = support ~ watchpro | conditn, data = fd)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.6563 -0.6446  0.3437  0.3437  0.3554 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  0.65627    0.03690   17.79   &lt;2e-16 ***
+watchpro    -0.01168    0.10603   -0.11    0.912    
+
+Diagnostic tests:
+                 df1 df2 statistic p-value    
+Weak instruments   1 439   131.261  &lt;2e-16 ***
+Wu-Hausman         1 438     0.737   0.391    
+Sargan             0  NA        NA      NA    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.4767 on 439 degrees of freedom
+Multiple R-Squared: 0.001756,   Adjusted R-squared: -0.0005184 
+Wald test: 0.01214 on 1 and 439 DF,  p-value: 0.9123 </code></pre>
+</div>
+</div>
+<section id="compare-the-three-quantities" class="level2">
+<h2 class="anchored" data-anchor-id="compare-the-three-quantities">Compare the three quantities</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>comparison_simple <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="st">"Naive OLS: Y ~ D"</span>,</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>               <span class="st">"Reduced form / ITT: Y ~ Z"</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>               <span class="st">"First stage / compliance: D ~ Z"</span>,</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>               <span class="st">"Manual Wald"</span>,</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>               <span class="st">"Wald / IV (simple)"</span>),</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">value =</span> <span class="fu">c</span>(</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_ols_support)[<span class="st">"watchpro"</span>],</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_rf_support)[<span class="st">"conditn"</span>],</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_first)[<span class="st">"conditn"</span>],</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    wald_support,</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_iv_support)[<span class="st">"watchpro"</span>]</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(comparison_simple, <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">estimate</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Naive OLS: Y ~ D</td>
+<td style="text-align: right;">-0.091</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Reduced form / ITT: Y ~ Z</td>
+<td style="text-align: right;">-0.005</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">First stage / compliance: D ~ Z</td>
+<td style="text-align: right;">0.407</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Manual Wald</td>
+<td style="text-align: right;">-0.012</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Wald / IV (simple)</td>
+<td style="text-align: right;">-0.012</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p><strong>Small groups.</strong> Why are these five estimates different? Which one has a causal interpretation under the IV assumptions?</p>
+</section>
+</section>
+<section id="step-5-add-covariates" class="level1">
+<h1>Step 5: Add covariates</h1>
+<p>The core IV logic comes from the randomized encouragement. Still, we can add pre-treatment covariates to improve precision.</p>
+<p>We will use the following covariates:</p>
+<ul>
+<li><code>partyid</code> (party identification)</li>
+<li><code>pnintst</code> (political interest)</li>
+<li><code>watchnat</code> (watches national news)</li>
+<li><code>educad</code> (education)</li>
+<li><code>readnews</code> (reads news)</li>
+<li><code>gender</code> (gender)</li>
+<li><code>income</code> (income)</li>
+<li><code>white</code> (race)</li>
+</ul>
+<p>Because <code>ivreg()</code> requires exogenous covariates to appear on both sides of the instrument formula, the model looks like this:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fd_support <span class="ot">&lt;-</span> fd <span class="sc">%&gt;%</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(support, watchpro, conditn, partyid, pnintst, watchnat, educad,</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>         readnews, gender, income, white) <span class="sc">%&gt;%</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">complete.cases</span>(.))</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(fd_support)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 441</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>m_ols_support_adj <span class="ot">&lt;-</span> <span class="fu">lm</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  support <span class="sc">~</span> watchpro <span class="sc">+</span> partyid <span class="sc">+</span> pnintst <span class="sc">+</span> watchnat <span class="sc">+</span> educad <span class="sc">+</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    readnews <span class="sc">+</span> gender <span class="sc">+</span> income <span class="sc">+</span> white,</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> fd_support</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_ols_support_adj)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = support ~ watchpro + partyid + pnintst + watchnat + 
+    educad + readnews + gender + income + white, data = fd_support)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-1.0082 -0.3536  0.1221  0.2803  0.7565 
+
+Coefficients:
+             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  1.029367   0.142025   7.248 1.97e-12 ***
+watchpro    -0.072110   0.045424  -1.587 0.113135    
+partyid     -0.085832   0.009575  -8.964  &lt; 2e-16 ***
+pnintst     -0.036382   0.029515  -1.233 0.218371    
+watchnat     0.008117   0.014377   0.565 0.572653    
+educad      -0.012528   0.007901  -1.586 0.113583    
+readnews    -0.006965   0.011499  -0.606 0.545043    
+gender      -0.026028   0.041317  -0.630 0.529052    
+income       0.006740   0.007748   0.870 0.384791    
+white        0.183034   0.052404   3.493 0.000527 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.4239 on 431 degrees of freedom
+Multiple R-squared:  0.2249,    Adjusted R-squared:  0.2087 
+F-statistic: 13.89 on 9 and 431 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>m_iv_support_adj <span class="ot">&lt;-</span> <span class="fu">ivreg</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  support <span class="sc">~</span> watchpro <span class="sc">+</span> partyid <span class="sc">+</span> pnintst <span class="sc">+</span> watchnat <span class="sc">+</span> educad <span class="sc">+</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    readnews <span class="sc">+</span> gender <span class="sc">+</span> income <span class="sc">+</span> white <span class="sc">|</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    conditn <span class="sc">+</span> partyid <span class="sc">+</span> pnintst <span class="sc">+</span> watchnat <span class="sc">+</span> educad <span class="sc">+</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    readnews <span class="sc">+</span> gender <span class="sc">+</span> income <span class="sc">+</span> white,</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> fd_support</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(fd)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 507  12</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nobs</span>(m_iv_support_adj)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 441</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_iv_support_adj, <span class="at">diagnostics =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ivreg(formula = support ~ watchpro + partyid + pnintst + watchnat + 
+    educad + readnews + gender + income + white | conditn + partyid + 
+    pnintst + watchnat + educad + readnews + gender + income + 
+    white, data = fd_support)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-1.0067 -0.3541  0.1236  0.2819  0.7577 
+
+Coefficients:
+             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  1.028583   0.142465   7.220 2.37e-12 ***
+watchpro    -0.066421   0.092714  -0.716 0.474125    
+partyid     -0.085878   0.009598  -8.947  &lt; 2e-16 ***
+pnintst     -0.036513   0.029574  -1.235 0.217640    
+watchnat     0.008138   0.014381   0.566 0.571757    
+educad      -0.012520   0.007902  -1.584 0.113864    
+readnews    -0.007043   0.011553  -0.610 0.542424    
+gender      -0.025910   0.041351  -0.627 0.531260    
+income       0.006736   0.007748   0.869 0.385097    
+white        0.183058   0.052406   3.493 0.000527 ***
+
+Diagnostic tests:
+                 df1 df2 statistic p-value    
+Weak instruments   1 431   136.139  &lt;2e-16 ***
+Wu-Hausman         1 430     0.005   0.944    
+Sargan             0  NA        NA      NA    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.4239 on 431 degrees of freedom
+Multiple R-Squared: 0.2248, Adjusted R-squared: 0.2087 
+Wald test: 13.67 on 9 and 431 DF,  p-value: &lt; 2.2e-16 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>comparison_adjusted <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="st">"Adjusted OLS"</span>, <span class="st">"Not adjusted OLS"</span>, <span class="st">"Adjusted IV"</span>, <span class="st">"Not adjusted IV"</span>),</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">value =</span> <span class="fu">c</span>(</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_ols_support_adj)[<span class="st">"watchpro"</span>],</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_ols_support)[<span class="st">"watchpro"</span>],</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_iv_support_adj)[<span class="st">"watchpro"</span>],</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coef</span>(m_iv_support)[<span class="st">"watchpro"</span>]</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(comparison_adjusted, <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">estimate</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Adjusted OLS</td>
+<td style="text-align: right;">-0.072</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Not adjusted OLS</td>
+<td style="text-align: right;">-0.091</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Adjusted IV</td>
+<td style="text-align: right;">-0.066</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Not adjusted IV</td>
+<td style="text-align: right;">-0.012</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="reflection-on-covariates" class="level2">
+<h2 class="anchored" data-anchor-id="reflection-on-covariates">Reflection on covariates</h2>
+<ul>
+<li>Did adding covariates substantially change the IV estimate? Why might covariates matter less for identification here than in a purely observational design?</li>
+</ul>
+</section>
+</section>
+<section id="step-6-principal-stratification-interpretation" class="level1">
+<h1>Step 6: Principal stratification interpretation</h1>
+<p>The IV estimate is not the treatment effect for all respondents. Under the usual assumptions, it is the <strong>Local Average Treatment Effect (LATE)</strong>, also called the <strong>Complier Average Causal Effect (CACE)</strong>.</p>
+<p>That means:</p>
+<ul>
+<li>the estimate applies to people whose viewing behavior was changed by encouragement,</li>
+<li>not to always-takers,</li>
+<li>not to never-takers,</li>
+<li>and not to the full sample as a whole.</li>
+</ul>
+<p>This is the connection to <strong>principal stratification</strong>: IV identifies a causal effect for one latent principal stratum, namely the <strong>compliers</strong>.</p>
+<section id="short-discussion" class="level2">
+<h2 class="anchored" data-anchor-id="short-discussion">Short discussion</h2>
+<ul>
+<li>How would you explain the IV estimate to a non-technical audience? What does it tell us about the effect of watching the debate on support for Proposition 209? &gt;The IV estimate tells us how <strong>encouragement</strong> to watch the debate affected the outcome by increasing actual watching among some respondents. Under the IV assumptions, this estimate is interpreted as the <strong>causal effect of watching for the compliers</strong>, meaning the people who watched only because they were encouraged. It does not describe the effect for everyone in the sample, but specifically for those whose behavior changed in response to encouragement.</li>
+</ul>
+</section>
+</section>
+<section id="step-7-profiling-compliers-with-ivdesc" class="level1">
+<h1>Step 7: Profiling compliers with <code>ivdesc</code></h1>
+<p>One advantage of the <code>ivdesc</code> package is that it lets us describe the covariate profile of the latent subpopulations (e.g., compliers, always-takers, never-takers).</p>
+<p>Below we use <code>readnews</code> as an example covariate.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>profile_readnews <span class="ot">&lt;-</span> <span class="fu">with</span>(fd, <span class="fu">ivdesc</span>(<span class="at">X =</span> readnews, <span class="at">D =</span> watchpro, <span class="at">Z =</span> conditn, <span class="at">boot =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>profile_readnews_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(profile_readnews)</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>profile_readnews_df</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   group       mu      mu_se         pi      pi_se
+1 sample 5.500990 0.08948441 1.00000000 0.00000000
+2     co 5.992418 0.21865402 0.40738261 0.03363887
+3     nt 5.169014 0.19041350 0.54826255 0.03098329
+4     at 5.090909 0.65302855 0.04435484 0.01309997</code></pre>
+</div>
+</div>
+<p>You can repeat this for other covariates such as <code>partyid</code>, <code>watchnat</code>, or <code>educad</code>. You can also write a function to automate this process and create a combined plot of covariate profiles for compliers, always-takers, and never-takers across multiple covariates.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>profile_iv_var <span class="ot">&lt;-</span> <span class="cf">function</span>(data, var, <span class="at">D =</span> <span class="st">"watchpro"</span>, <span class="at">Z =</span> <span class="st">"conditn"</span>, <span class="at">label =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  out_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    ivdesc<span class="sc">::</span><span class="fu">ivdesc</span>(</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">X =</span> data[[var]],</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>      <span class="at">D =</span> data[[D]],</span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">Z =</span> data[[Z]],</span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">boot =</span> <span class="cn">FALSE</span></span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Check that ivdesc returned the expected structure</span></span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">all</span>(<span class="fu">c</span>(<span class="st">"mu"</span>, <span class="st">"mu_se"</span>) <span class="sc">%in%</span> <span class="fu">names</span>(out_df))) {</span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"The ivdesc output does not contain 'mu' and 'mu_se'. Run as.data.frame(ivdesc(...)) and inspect it."</span>)</span>
+<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nrow</span>(out_df) <span class="sc">!=</span> <span class="dv">4</span>) {</span>
+<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"Expected 4 rows from ivdesc(): Sample, Complier, Never-taker, Always-taker."</span>)</span>
+<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a>  rng <span class="ot">&lt;-</span> <span class="fu">range</span>(data[[var]], <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a>  facet_label <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">is.null</span>(label)) {</span>
+<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">paste0</span>(var, <span class="st">" ["</span>, <span class="fu">round</span>(rng[<span class="dv">1</span>], <span class="dv">2</span>), <span class="st">"–"</span>, <span class="fu">round</span>(rng[<span class="dv">2</span>], <span class="dv">2</span>), <span class="st">"]"</span>)</span>
+<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">paste0</span>(label, <span class="st">" ["</span>, <span class="fu">round</span>(rng[<span class="dv">1</span>], <span class="dv">2</span>), <span class="st">"–"</span>, <span class="fu">round</span>(rng[<span class="dv">2</span>], <span class="dv">2</span>), <span class="st">"]"</span>)</span>
+<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a>  out_df <span class="sc">%&gt;%</span></span>
+<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb35-30"><a href="#cb35-30" aria-hidden="true" tabindex="-1"></a>      <span class="at">group =</span> <span class="fu">factor</span>(</span>
+<span id="cb35-31"><a href="#cb35-31" aria-hidden="true" tabindex="-1"></a>        <span class="fu">c</span>(<span class="st">"Sample"</span>, <span class="st">"Complier"</span>, <span class="st">"Never-taker"</span>, <span class="st">"Always-taker"</span>),</span>
+<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a>        <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"Sample"</span>, <span class="st">"Complier"</span>, <span class="st">"Never-taker"</span>, <span class="st">"Always-taker"</span>)</span>
+<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a>      <span class="at">lower =</span> mu <span class="sc">-</span> <span class="fl">1.96</span> <span class="sc">*</span> mu_se,</span>
+<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a>      <span class="at">upper =</span> mu <span class="sc">+</span> <span class="fl">1.96</span> <span class="sc">*</span> mu_se,</span>
+<span id="cb35-36"><a href="#cb35-36" aria-hidden="true" tabindex="-1"></a>      <span class="at">facet =</span> facet_label</span>
+<span id="cb35-37"><a href="#cb35-37" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb35-38"><a href="#cb35-38" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(facet, group, mu, mu_se, lower, upper)</span>
+<span id="cb35-39"><a href="#cb35-39" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb35-40"><a href="#cb35-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-41"><a href="#cb35-41" aria-hidden="true" tabindex="-1"></a>profiles <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb35-42"><a href="#cb35-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"educad"</span>,   <span class="at">label =</span> <span class="st">"Education"</span>),</span>
+<span id="cb35-43"><a href="#cb35-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"gender"</span>,   <span class="at">label =</span> <span class="st">"Female"</span>),</span>
+<span id="cb35-44"><a href="#cb35-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"income"</span>,   <span class="at">label =</span> <span class="st">"Income"</span>),</span>
+<span id="cb35-45"><a href="#cb35-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"partyid"</span>,  <span class="at">label =</span> <span class="st">"Party ID"</span>),</span>
+<span id="cb35-46"><a href="#cb35-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"pnintst"</span>,  <span class="at">label =</span> <span class="st">"Political interest"</span>),</span>
+<span id="cb35-47"><a href="#cb35-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"readnews"</span>, <span class="at">label =</span> <span class="st">"Reads news"</span>),</span>
+<span id="cb35-48"><a href="#cb35-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"watchnat"</span>, <span class="at">label =</span> <span class="st">"Watches national news"</span>),</span>
+<span id="cb35-49"><a href="#cb35-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">profile_iv_var</span>(fd, <span class="st">"white"</span>,    <span class="at">label =</span> <span class="st">"White"</span>)</span>
+<span id="cb35-50"><a href="#cb35-50" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb35-51"><a href="#cb35-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-52"><a href="#cb35-52" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(profiles, <span class="fu">aes</span>(<span class="at">x =</span> mu, <span class="at">y =</span> group)) <span class="sc">+</span></span>
+<span id="cb35-53"><a href="#cb35-53" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbarh</span>(<span class="fu">aes</span>(<span class="at">xmin =</span> lower, <span class="at">xmax =</span> upper), <span class="at">height =</span> <span class="dv">0</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb35-54"><a href="#cb35-54" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">2.8</span>) <span class="sc">+</span></span>
+<span id="cb35-55"><a href="#cb35-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> facet, <span class="at">scales =</span> <span class="st">"free_x"</span>, <span class="at">ncol =</span> <span class="dv">3</span>) <span class="sc">+</span></span>
+<span id="cb35-56"><a href="#cb35-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb35-57"><a href="#cb35-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Covariate profiles by principal stratum"</span>,</span>
+<span id="cb35-58"><a href="#cb35-58" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Mean and 95% confidence interval"</span>,</span>
+<span id="cb35-59"><a href="#cb35-59" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="cn">NULL</span></span>
+<span id="cb35-60"><a href="#cb35-60" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb35-61"><a href="#cb35-61" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">13</span>) <span class="sc">+</span></span>
+<span id="cb35-62"><a href="#cb35-62" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb35-63"><a href="#cb35-63" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>),</span>
+<span id="cb35-64"><a href="#cb35-64" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid.minor =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb35-65"><a href="#cb35-65" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="lab8_files/figure-html/iv-info-comparison-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="interpretation-of-covariate-profiles" class="level2">
+<h2 class="anchored" data-anchor-id="interpretation-of-covariate-profiles">Interpretation of covariate profiles</h2>
+<ul>
+<li>Compare the estimated mean of the different covariates for compliers, always-takers, and never-takers.</li>
+</ul>
+<p>What does that suggest about <strong>who the compliers are</strong> in this study?</p>
+</section>
+</section>
+<section id="step-8-extension-outcome" class="level1">
+<h1>Step 8: Extension outcome</h1>
+<p>Now repeat the IV analysis using <code>infopro</code> instead of <code>support</code>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>fd_info <span class="ot">&lt;-</span> fd <span class="sc">%&gt;%</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(infopro, watchpro, conditn, partyid, pnintst, watchnat, educad,</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>         readnews, gender, income, white) <span class="sc">%&gt;%</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">complete.cases</span>(.))</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="fu">nrow</span>(fd_info)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 498</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>m_iv_info <span class="ot">&lt;-</span> <span class="fu">ivreg</span>(infopro <span class="sc">~</span> watchpro <span class="sc">|</span> conditn, <span class="at">data =</span> fd_info)</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_iv_info, <span class="at">diagnostics =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ivreg(formula = infopro ~ watchpro | conditn, data = fd_info)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.4055 -0.4055 -0.1732  0.8268  0.8268 
+
+Coefficients:
+            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  3.17325    0.05842  54.321   &lt;2e-16 ***
+watchpro     0.23221    0.17642   1.316    0.189    
+
+Diagnostic tests:
+                 df1 df2 statistic p-value    
+Weak instruments   1 496   146.646  &lt;2e-16 ***
+Wu-Hausman         1 495     0.171   0.679    
+Sargan             0  NA        NA      NA    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.8219 on 496 degrees of freedom
+Multiple R-Squared: 0.02321,    Adjusted R-squared: 0.02124 
+Wald test: 1.732 on 1 and 496 DF,  p-value: 0.1887 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>m_iv_info_adj <span class="ot">&lt;-</span> <span class="fu">ivreg</span>(</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  infopro <span class="sc">~</span> watchpro <span class="sc">+</span> partyid <span class="sc">+</span> pnintst <span class="sc">+</span> watchnat <span class="sc">+</span> educad <span class="sc">+</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>    readnews <span class="sc">+</span> gender <span class="sc">+</span> income <span class="sc">+</span> white <span class="sc">|</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>    conditn <span class="sc">+</span> partyid <span class="sc">+</span> pnintst <span class="sc">+</span> watchnat <span class="sc">+</span> educad <span class="sc">+</span></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    readnews <span class="sc">+</span> gender <span class="sc">+</span> income <span class="sc">+</span> white,</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> fd_info</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_iv_info_adj, <span class="at">diagnostics =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ivreg(formula = infopro ~ watchpro + partyid + pnintst + watchnat + 
+    educad + readnews + gender + income + white | conditn + partyid + 
+    pnintst + watchnat + educad + readnews + gender + income + 
+    white, data = fd_info)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.5209 -0.4678  0.1808  0.5174  1.9674 
+
+Coefficients:
+              Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)  1.7974733  0.2341983   7.675 9.08e-14 ***
+watchpro     0.2710942  0.1581696   1.714   0.0872 .  
+partyid     -0.0172838  0.0159602  -1.083   0.2794    
+pnintst      0.2516340  0.0473181   5.318 1.60e-07 ***
+watchnat     0.0003988  0.0240421   0.017   0.9868    
+educad       0.0034257  0.0128887   0.266   0.7905    
+readnews     0.1078912  0.0188852   5.713 1.93e-08 ***
+gender      -0.0527521  0.0686682  -0.768   0.4427    
+income      -0.0089268  0.0129878  -0.687   0.4922    
+white        0.0657215  0.0855288   0.768   0.4426    
+
+Diagnostic tests:
+                 df1 df2 statistic p-value    
+Weak instruments   1 488   151.612  &lt;2e-16 ***
+Wu-Hausman         1 487     0.089   0.766    
+Sargan             0  NA        NA      NA    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.7467 on 488 degrees of freedom
+Multiple R-Squared: 0.2067, Adjusted R-squared: 0.192 
+Wald test: 13.49 on 9 and 488 DF,  p-value: &lt; 2.2e-16 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare all models (e.g., infopro and support, simple and adjusted) in a single table or plot.</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(<span class="fu">data.frame</span>(</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="st">"IV (simple) for infopro"</span>, <span class="st">"IV (adjusted) for infopro"</span>, <span class="st">"IV (simple) for support"</span>, <span class="st">"IV (adjusted) for support"</span>),</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">value =</span> <span class="fu">c</span>(<span class="fu">coef</span>(m_iv_info)[<span class="st">"watchpro"</span>], <span class="fu">coef</span>(m_iv_info_adj)[<span class="st">"watchpro"</span>], <span class="fu">coef</span>(m_iv_support)[<span class="st">"watchpro"</span>], <span class="fu">coef</span>(m_iv_support_adj)[<span class="st">"watchpro"</span>])</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>), <span class="at">digits =</span> <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">estimate</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">IV (simple) for infopro</td>
+<td style="text-align: right;">0.232</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">IV (adjusted) for infopro</td>
+<td style="text-align: right;">0.271</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">IV (simple) for support</td>
+<td style="text-align: right;">-0.012</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">IV (adjusted) for support</td>
+<td style="text-align: right;">-0.066</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="group-discussion" class="level2">
+<h2 class="anchored" data-anchor-id="group-discussion">Group discussion</h2>
+<p>Do the results look more convincing for <code>infopro</code> than for <code>support</code>? Why might media exposure affect feeling informed more directly than vote choice or policy support?</p>
+</section>
+</section>
+<section id="step-9-assumptions" class="level1">
+<h1>Step 9: Assumptions</h1>
+<p>IV requires more than random assignment:</p>
+<section id="relevance" class="level2">
+<h2 class="anchored" data-anchor-id="relevance">1. Relevance</h2>
+<p>The instrument must affect treatment uptake.</p>
+<ul>
+<li>Here: encouragement must increase the probability of watching.</li>
+</ul>
+</section>
+<section id="independence" class="level2">
+<h2 class="anchored" data-anchor-id="independence">2. Independence</h2>
+<p>The instrument must be as good as randomly assigned.</p>
+<ul>
+<li>Here: this is built into the research design.</li>
+</ul>
+</section>
+<section id="exclusion-restriction" class="level2">
+<h2 class="anchored" data-anchor-id="exclusion-restriction">3. Exclusion restriction</h2>
+<p>The instrument affects the outcome only through the treatment.</p>
+<ul>
+<li>Here: encouragement should affect attitudes only because it changed viewing behavior.</li>
+</ul>
+</section>
+<section id="monotonicity" class="level2">
+<h2 class="anchored" data-anchor-id="monotonicity">4. Monotonicity</h2>
+<p>There are no defiers.</p>
+<ul>
+<li>Here: nobody should become <em>less</em> likely to watch because they were encouraged.</li>
+</ul>
+</section>
+<section id="assumptions-debate-group-discussion" class="level2">
+<h2 class="anchored" data-anchor-id="assumptions-debate-group-discussion">Assumptions debate (group discussion)</h2>
+<ol type="1">
+<li>What does this assumptions mean in this study?</li>
+<li>Why might them be plausible?</li>
+<li>What could threaten them?</li>
+<li>If they fail, how would the interpretation of the IV estimate change?</li>
+</ol>
+</section>
+</section>
+<section id="final-takeaway" class="level1">
+<h1>Final takeaway</h1>
+<p>This lab shows why <strong>principal stratification</strong> and <strong>instrumental variables</strong> belong together.</p>
+<ul>
+<li>Random encouragement gives us an instrument.</li>
+<li>Imperfect uptake creates noncompliance.</li>
+<li>The first stage captures how encouragement changes treatment uptake.</li>
+<li>The reduced form captures how encouragement changes outcomes.</li>
+<li>The IV/Wald estimator scales the reduced form by compliance.</li>
+<li>The result is a causal effect for <strong>compliers</strong>, not for everyone.</li>
+</ul>
+<p>That is the core logic of LATE/CACE in randomized encouragement designs.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

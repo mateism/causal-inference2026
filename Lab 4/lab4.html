@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-03-04">
+
+<title>Lab 4 — Estimands in practice</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="lab4_files/libs/clipboard/clipboard.min.js"></script>
+<script src="lab4_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="lab4_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="lab4_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="lab4_files/libs/quarto-html/popper.min.js"></script>
+<script src="lab4_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="lab4_files/libs/quarto-html/anchor.min.js"></script>
+<link href="lab4_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="lab4_files/libs/quarto-html/quarto-syntax-highlighting-ed96de9b727972fe78a7b5d16c58bf87.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="lab4_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="lab4_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="lab4_files/libs/bootstrap/bootstrap-d6a003b94517c951b2d65075d42fb01b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 4 — Estimands in practice</h1>
+<p class="subtitle lead">Applied workflows: from estimands to estimators (and why coefficients are not enough)</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 4, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="what-we-do-in-this-lab-90-minutes" class="level2">
+<h2 class="anchored" data-anchor-id="what-we-do-in-this-lab-90-minutes">What we do in this lab (90 minutes)</h2>
+<p>This file is <strong>practice-first</strong>: you will compute estimates for multiple estimands using simulated and (when available) real data.</p>
+<p>If you have <code>estimand_workflow.png</code> in the same folder, you can display the workflow reminder:</p>
+<hr>
+</section>
+<section id="packages" class="level2">
+<h2 class="anchored" data-anchor-id="packages">0. Packages</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pkgs <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"tidyverse"</span>, <span class="st">"broom"</span>, <span class="st">"marginaleffects"</span>, <span class="st">"dagitty"</span>, <span class="st">"ggdag"</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>missing <span class="ot">&lt;-</span> pkgs[<span class="sc">!</span><span class="fu">vapply</span>(pkgs, requireNamespace, <span class="fu">logical</span>(<span class="dv">1</span>), <span class="at">quietly =</span> <span class="cn">TRUE</span>)]</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(missing) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="st">"Missing packages:</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">paste0</span>(<span class="st">"- "</span>, missing, <span class="at">collapse =</span> <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>),</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>      <span class="st">"</span><span class="sc">\n\n</span><span class="st">Install with:</span><span class="sc">\n</span><span class="st">install.packages(c("</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>      <span class="fu">paste</span>(<span class="fu">sprintf</span>(<span class="st">'</span><span class="sc">\"</span><span class="st">%s</span><span class="sc">\"</span><span class="st">'</span>, missing), <span class="at">collapse =</span> <span class="st">", "</span>),</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>      <span class="st">"))</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Optional packages used if installed: - <code>mediation</code> (natural direct/indirect effects) - <code>ivreg</code> (2SLS) - <code>causaldata</code> or <code>MatchIt</code> (Lalonde job training)</p>
+<hr>
+</section>
+<section id="ateattatccate-with-confounding-heterogeneity-simulation" class="level2">
+<h2 class="anchored" data-anchor-id="ateattatccate-with-confounding-heterogeneity-simulation">1. ATE/ATT/ATC/CATE with confounding + heterogeneity (simulation)</h2>
+<section id="simulate-a-world" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-a-world">1.1 Simulate a world</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">6000</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># True heterogeneous effect: higher effect when X&gt;0</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>tau_x <span class="ot">&lt;-</span> <span class="fl">0.3</span> <span class="sc">+</span> <span class="fl">0.8</span> <span class="sc">*</span> (X <span class="sc">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Potential outcomes</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>Y0 <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">+</span> <span class="fl">0.7</span> <span class="sc">*</span> X <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="dv">1</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>Y1 <span class="ot">&lt;-</span> Y0 <span class="sc">+</span> tau_x</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Confounded treatment assignment</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>pD <span class="ot">&lt;-</span> <span class="fu">plogis</span>(<span class="sc">-</span><span class="fl">0.2</span> <span class="sc">+</span> <span class="fl">1.0</span> <span class="sc">*</span> X)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>D  <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pD)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>Y <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(D <span class="sc">==</span> <span class="dv">1</span>, Y1, Y0)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">tibble</span>(Y, D, X, Y0, Y1, tau_x, pD)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>df <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">glimpse</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 6,000
+Columns: 7
+$ Y     &lt;dbl&gt; -0.09156106, 1.83532729, 2.49835047, 0.94587283, 1.69436748, 2.6…
+$ D     &lt;int&gt; 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0…
+$ X     &lt;dbl&gt; -0.56047565, -0.23017749, 1.55870831, 0.07050839, 0.12928774, 1.…
+$ Y0    &lt;dbl&gt; -0.09156106, 1.83532729, 1.39835047, 0.94587283, 1.69436748, 1.5…
+$ Y1    &lt;dbl&gt; 0.2084389, 2.1353273, 2.4983505, 2.0458728, 2.7943675, 2.6925005…
+$ tau_x &lt;dbl&gt; 0.3, 0.3, 1.1, 1.1, 1.1, 1.1, 1.1, 0.3, 0.3, 0.3, 1.1, 1.1, 1.1,…
+$ pD    &lt;dbl&gt; 0.3185430, 0.3940839, 0.7955497, 0.4676723, 0.4823293, 0.8198106…</code></pre>
+</div>
+</div>
+</section>
+<section id="truth-theoretical-estimands-because-we-have-potential-outcomes" class="level3">
+<h3 class="anchored" data-anchor-id="truth-theoretical-estimands-because-we-have-potential-outcomes">1.2 “Truth” (theoretical estimands) because we have potential outcomes</h3>
+<ul>
+<li><strong>ATE</strong></li>
+<li><strong>ATT</strong></li>
+<li><strong>ATC</strong></li>
+<li><strong>CATE</strong></li>
+</ul>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>true <span class="ot">&lt;-</span> <span class="fu">tibble</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimand =</span> <span class="fu">c</span>(<span class="st">"ATE"</span>, <span class="st">"ATT"</span>, <span class="st">"ATC"</span>, <span class="st">"CATE: X&gt;0"</span>, <span class="st">"CATE: X&lt;=0"</span>),</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">value =</span> <span class="fu">c</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>(df<span class="sc">$</span>Y1 <span class="sc">-</span> df<span class="sc">$</span>Y0),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>((df<span class="sc">$</span>Y1 <span class="sc">-</span> df<span class="sc">$</span>Y0)[df<span class="sc">$</span>D <span class="sc">==</span> <span class="dv">1</span>]),</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>((df<span class="sc">$</span>Y1 <span class="sc">-</span> df<span class="sc">$</span>Y0)[df<span class="sc">$</span>D <span class="sc">==</span> <span class="dv">0</span>]),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>((df<span class="sc">$</span>Y1 <span class="sc">-</span> df<span class="sc">$</span>Y0)[df<span class="sc">$</span>X <span class="sc">&gt;</span> <span class="dv">0</span>]),</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mean</span>((df<span class="sc">$</span>Y1 <span class="sc">-</span> df<span class="sc">$</span>Y0)[df<span class="sc">$</span>X <span class="sc">&lt;=</span> <span class="dv">0</span>])</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>true</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 5 × 2
+  estimand   value
+  &lt;chr&gt;      &lt;dbl&gt;
+1 ATE        0.700
+2 ATT        0.854
+3 ATC        0.570
+4 CATE: X&gt;0  1.1  
+5 CATE: X&lt;=0 0.3  </code></pre>
+</div>
+</div>
+</section>
+<section id="naive-estimator-difference-in-means" class="level3">
+<h3 class="anchored" data-anchor-id="naive-estimator-difference-in-means">1.3 Naive estimator (difference in means)</h3>
+<p>Empirical target (no adjustment)</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>naive <span class="ot">&lt;-</span> <span class="fu">with</span>(df, <span class="fu">mean</span>(Y[D<span class="sc">==</span><span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">mean</span>(Y[D<span class="sc">==</span><span class="dv">0</span>]))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>naive</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 1.433929</code></pre>
+</div>
+</div>
+</section>
+<section id="g-formula-imputation-estimator-regression-predict-potential-outcomes" class="level3">
+<h3 class="anchored" data-anchor-id="g-formula-imputation-estimator-regression-predict-potential-outcomes">1.4 G-formula / imputation estimator (regression → predict potential outcomes)</h3>
+<p>The g-formula refers to the idea of modeling the outcome as a function of treatment and covariates, then using that model to predict potential outcomes under different treatment scenarios, and finally averaging those predictions to estimate causal effects. Empirical estimand: g-formula with a regression model that allows for heterogeneity (interaction with X).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>m_g <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y <span class="sc">~</span> D <span class="sc">*</span> X, <span class="at">data =</span> df)  <span class="co"># allow heterogeneity via interaction</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>df_g <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">yhat1 =</span> <span class="fu">predict</span>(m_g, <span class="at">newdata =</span> <span class="fu">mutate</span>(., <span class="at">D =</span> <span class="dv">1</span>)),</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">yhat0 =</span> <span class="fu">predict</span>(m_g, <span class="at">newdata =</span> <span class="fu">mutate</span>(., <span class="at">D =</span> <span class="dv">0</span>)),</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">diff  =</span> yhat1 <span class="sc">-</span> yhat0</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>ate_hat <span class="ot">&lt;-</span> <span class="fu">mean</span>(df_g<span class="sc">$</span>diff)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>att_hat <span class="ot">&lt;-</span> <span class="fu">mean</span>(df_g<span class="sc">$</span>diff[df<span class="sc">$</span>D<span class="sc">==</span><span class="dv">1</span>])</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>atc_hat <span class="ot">&lt;-</span> <span class="fu">mean</span>(df_g<span class="sc">$</span>diff[df<span class="sc">$</span>D<span class="sc">==</span><span class="dv">0</span>])</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimand =</span> <span class="fu">c</span>(<span class="st">"ATE"</span>, <span class="st">"ATT"</span>, <span class="st">"ATC"</span>),</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(ate_hat, att_hat, atc_hat)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 2
+  estimand estimate
+  &lt;chr&gt;       &lt;dbl&gt;
+1 ATE         0.709
+2 ATT         0.852
+3 ATC         0.588</code></pre>
+</div>
+</div>
+<p><strong>Coefficient vs estimand:</strong> the <em>coefficient</em> on <code>D</code> is not “the ATE” once effects vary with X.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">coef</span>(m_g)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>(Intercept)           D           X         D:X 
+  0.9999806   0.7075100   0.7077319   0.3218371 </code></pre>
+</div>
+</div>
+</section>
+<section id="ipw-propensity-score-weighting" class="level3">
+<h3 class="anchored" data-anchor-id="ipw-propensity-score-weighting">1.6 IPW (propensity score weighting)</h3>
+<p>Propensity score weighting re-weights the sample to create a pseudo-population where treatment is independent of covariates, allowing for estimation of causal effects without modeling the outcome directly. For the ATE, we use inverse probability of treatment weights (IPTW), where treated units are weighted by 1/e_hat and control units are weighted by 1/(1-e_hat):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>m_ps <span class="ot">&lt;-</span> <span class="fu">glm</span>(D <span class="sc">~</span> X, <span class="at">data =</span> df, <span class="at">family =</span> <span class="fu">binomial</span>())</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>e_hat <span class="ot">&lt;-</span> <span class="fu">predict</span>(m_ps, <span class="at">type =</span> <span class="st">"response"</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>w_ate <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(df<span class="sc">$</span>D<span class="sc">==</span><span class="dv">1</span>, <span class="dv">1</span><span class="sc">/</span>e_hat, <span class="dv">1</span><span class="sc">/</span>(<span class="dv">1</span><span class="sc">-</span>e_hat))</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>ipw_ate <span class="ot">&lt;-</span> <span class="fu">with</span>(df, <span class="fu">weighted.mean</span>(Y[D<span class="sc">==</span><span class="dv">1</span>], w_ate[D<span class="sc">==</span><span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">weighted.mean</span>(Y[D<span class="sc">==</span><span class="dv">0</span>], w_ate[D<span class="sc">==</span><span class="dv">0</span>]))</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>ipw_ate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.6555566</code></pre>
+</div>
+</div>
+<p><strong>ATT weights</strong>: For the ATT, we weight treated units by 1 and control units by the odds of treatment (e_hat/(1-e_hat)):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>w_att <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(df<span class="sc">$</span>D<span class="sc">==</span><span class="dv">1</span>, <span class="dv">1</span>, e_hat<span class="sc">/</span>(<span class="dv">1</span><span class="sc">-</span>e_hat))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>ipw_att <span class="ot">&lt;-</span> <span class="fu">with</span>(df, <span class="fu">weighted.mean</span>(Y[D<span class="sc">==</span><span class="dv">1</span>], w_att[D<span class="sc">==</span><span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">weighted.mean</span>(Y[D<span class="sc">==</span><span class="dv">0</span>], w_att[D<span class="sc">==</span><span class="dv">0</span>]))</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>ipw_att</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.8481572</code></pre>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="causal-interaction-22-factorial-design" class="level2">
+<h2 class="anchored" data-anchor-id="causal-interaction-22-factorial-design">2. Causal interaction (2×2 factorial design)</h2>
+<section id="simulate-a-factorial-experiment" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-a-factorial-experiment">2.1 Simulate a factorial experiment</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">8000</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.5</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>D <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.5</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>linpred <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span> <span class="sc">+</span> <span class="fl">0.4</span><span class="sc">*</span>A <span class="sc">+</span> <span class="fl">0.6</span><span class="sc">*</span>D <span class="sc">-</span> <span class="fl">0.7</span><span class="sc">*</span>(A<span class="sc">*</span>D)  <span class="co"># negative interaction</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">plogis</span>(linpred)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>Y <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, p)</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>fd <span class="ot">&lt;-</span> <span class="fu">tibble</span>(Y, A, D)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="estimate-by-cell-means-difference-in-differences" class="level3">
+<h3 class="anchored" data-anchor-id="estimate-by-cell-means-difference-in-differences">2.2 Estimate by cell means (difference-in-differences)</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>cell <span class="ot">&lt;-</span> fd <span class="sc">%&gt;%</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(A, D) <span class="sc">%&gt;%</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">p =</span> <span class="fu">mean</span>(Y), <span class="at">n =</span> <span class="fu">n</span>(), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>cell</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 4 × 4
+      A     D     p     n
+  &lt;int&gt; &lt;int&gt; &lt;dbl&gt; &lt;int&gt;
+1     0     0 0.264  2072
+2     0     1 0.390  2036
+3     1     0 0.352  1914
+4     1     1 0.342  1978</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>p11 <span class="ot">&lt;-</span> cell<span class="sc">$</span>p[cell<span class="sc">$</span>A<span class="sc">==</span><span class="dv">1</span> <span class="sc">&amp;</span> cell<span class="sc">$</span>D<span class="sc">==</span><span class="dv">1</span>]</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>p10 <span class="ot">&lt;-</span> cell<span class="sc">$</span>p[cell<span class="sc">$</span>A<span class="sc">==</span><span class="dv">1</span> <span class="sc">&amp;</span> cell<span class="sc">$</span>D<span class="sc">==</span><span class="dv">0</span>]</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>p01 <span class="ot">&lt;-</span> cell<span class="sc">$</span>p[cell<span class="sc">$</span>A<span class="sc">==</span><span class="dv">0</span> <span class="sc">&amp;</span> cell<span class="sc">$</span>D<span class="sc">==</span><span class="dv">1</span>]</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>p00 <span class="ot">&lt;-</span> cell<span class="sc">$</span>p[cell<span class="sc">$</span>A<span class="sc">==</span><span class="dv">0</span> <span class="sc">&amp;</span> cell<span class="sc">$</span>D<span class="sc">==</span><span class="dv">0</span>]</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>tau_int_hat <span class="ot">&lt;-</span> (p11 <span class="sc">-</span> p10) <span class="sc">-</span> (p01 <span class="sc">-</span> p00)</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>tau_int_hat</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] -0.136344</code></pre>
+</div>
+</div>
+</section>
+<section id="same-estimand-via-regression" class="level3">
+<h3 class="anchored" data-anchor-id="same-estimand-via-regression">2.3 Same estimand via regression</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>m_int <span class="ot">&lt;-</span> <span class="fu">glm</span>(Y <span class="sc">~</span> A <span class="sc">*</span> D, <span class="at">data =</span> fd, <span class="at">family =</span> <span class="fu">binomial</span>())</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(m_int)<span class="sc">$</span>coefficients[<span class="st">"A:D"</span>, ]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Estimate    Std. Error       z value      Pr(&gt;|z|) 
+-6.239721e-01  9.532722e-02 -6.545582e+00  5.926433e-11 </code></pre>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="mediation-cde-vs-nde-simulation" class="level2">
+<h2 class="anchored" data-anchor-id="mediation-cde-vs-nde-simulation">3. Mediation: CDE vs NDE (simulation)</h2>
+<section id="simulate-data-with-a-mediator" class="level3">
+<h3 class="anchored" data-anchor-id="simulate-data-with-a-mediator">3.1 Simulate data with a mediator</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">7000</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>pD <span class="ot">&lt;-</span> <span class="fu">plogis</span>(<span class="sc">-</span><span class="fl">0.1</span> <span class="sc">+</span> <span class="fl">0.8</span><span class="sc">*</span>X)</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>D <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pD)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>pM <span class="ot">&lt;-</span> <span class="fu">plogis</span>(<span class="sc">-</span><span class="fl">0.2</span> <span class="sc">+</span> <span class="fl">0.9</span><span class="sc">*</span>D <span class="sc">+</span> <span class="fl">0.6</span><span class="sc">*</span>X)</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>M <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pM)</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>pY <span class="ot">&lt;-</span> <span class="fu">plogis</span>(<span class="sc">-</span><span class="dv">1</span> <span class="sc">+</span> <span class="fl">0.5</span><span class="sc">*</span>D <span class="sc">+</span> <span class="fl">0.9</span><span class="sc">*</span>M <span class="sc">-</span> <span class="fl">0.4</span><span class="sc">*</span>D<span class="sc">*</span>M <span class="sc">+</span> <span class="fl">0.5</span><span class="sc">*</span>X)</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>Y <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, pY)</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>mdf <span class="ot">&lt;-</span> <span class="fu">tibble</span>(Y, D, M, X)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="controlled-direct-effect-cde" class="level3">
+<h3 class="anchored" data-anchor-id="controlled-direct-effect-cde">3.2 Controlled Direct Effect (CDE)</h3>
+<p>The controlled direct effect (CDE) of a treatment on an outcome is the effect of the treatment on the outcome when the mediator is held fixed at a specific value (interaction of D and M). It quantifies the direct effect of the treatment that is not mediated through the mediator variable.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>m_y <span class="ot">&lt;-</span> <span class="fu">glm</span>(Y <span class="sc">~</span> D <span class="sc">*</span> M <span class="sc">+</span> X, <span class="at">data =</span> mdf, <span class="at">family =</span> <span class="fu">binomial</span>())</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>pred_cde <span class="ot">&lt;-</span> <span class="cf">function</span>(m_val){</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  y1m <span class="ot">&lt;-</span> <span class="fu">predict</span>(m_y, <span class="at">newdata =</span> <span class="fu">mutate</span>(mdf, <span class="at">D =</span> <span class="dv">1</span>, <span class="at">M =</span> m_val), <span class="at">type =</span> <span class="st">"response"</span>)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  y0m <span class="ot">&lt;-</span> <span class="fu">predict</span>(m_y, <span class="at">newdata =</span> <span class="fu">mutate</span>(mdf, <span class="at">D =</span> <span class="dv">0</span>, <span class="at">M =</span> m_val), <span class="at">type =</span> <span class="st">"response"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mean</span>(y1m <span class="sc">-</span> y0m)</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimand =</span> <span class="fu">c</span>(<span class="st">"CDE(m=0)"</span>, <span class="st">"CDE(m=1)"</span>),</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(<span class="fu">pred_cde</span>(<span class="dv">0</span>), <span class="fu">pred_cde</span>(<span class="dv">1</span>))</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 2 × 2
+  estimand estimate
+  &lt;chr&gt;       &lt;dbl&gt;
+1 CDE(m=0)   0.109 
+2 CDE(m=1)   0.0229</code></pre>
+</div>
+</div>
+</section>
+<section id="natural-direct-effect-nde-and-natural-indirect-effect-nie" class="level3">
+<h3 class="anchored" data-anchor-id="natural-direct-effect-nde-and-natural-indirect-effect-nie">3.3 Natural Direct Effect (NDE) and Natural Indirect Effect (NIE)</h3>
+<p>The natural direct effect (NDE) of a treatment on an outcome is the effect of the treatment on the outcome that is not mediated through a specific mediator variable, while allowing the mediator to take its natural value as it would under no treatment.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"mediation"</span>)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(mediation)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>m_m <span class="ot">&lt;-</span> <span class="fu">glm</span>(M <span class="sc">~</span> D <span class="sc">+</span> X, <span class="at">data =</span> mdf, <span class="at">family =</span> <span class="fu">binomial</span>())</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>m_y <span class="ot">&lt;-</span> <span class="fu">glm</span>(Y <span class="sc">~</span> D <span class="sc">+</span> M <span class="sc">+</span> X, <span class="at">data =</span> mdf, <span class="at">family =</span> <span class="fu">binomial</span>())</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>med <span class="ot">&lt;-</span> <span class="fu">mediate</span>(m_m, m_y, <span class="at">treat =</span> <span class="st">"D"</span>, <span class="at">mediator =</span> <span class="st">"M"</span>, <span class="at">sims =</span> <span class="dv">500</span>)</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(med)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+</section>
+</section>
+<section id="noncompliance-itt-and-late-simulation" class="level2">
+<h2 class="anchored" data-anchor-id="noncompliance-itt-and-late-simulation">4. Noncompliance: ITT and LATE (simulation)</h2>
+<ul>
+<li><strong>ITT</strong>: The intention-to-treat (ITT) effect is the average effect of being assigned to the treatment group, regardless of whether individuals actually received the treatment or not. It captures the effect of the assignment itself, which can be useful for policy evaluation and real-world applicability.</li>
+<li><strong>LATE (Wald)</strong>: The Local Average Treatment Effect (LATE) is the average effect of the treatment for the subgroup of individuals who comply with their assigned treatment. It is estimated using the Wald estimator, which divides the ITT effect on the outcome by the ITT effect on the treatment received, effectively isolating the effect for compliers.</li>
+</ul>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">9000</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>Z <span class="ot">&lt;-</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.5</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>type <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="fu">c</span>(<span class="st">"never"</span>,<span class="st">"always"</span>,<span class="st">"complier"</span>), n, <span class="at">replace=</span><span class="cn">TRUE</span>, <span class="at">prob=</span><span class="fu">c</span>(<span class="fl">0.55</span>, <span class="fl">0.10</span>, <span class="fl">0.35</span>))</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>D0 <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(type<span class="sc">==</span><span class="st">"always"</span>, <span class="dv">1</span>, <span class="dv">0</span>)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>D1 <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(type <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"always"</span>,<span class="st">"complier"</span>), <span class="dv">1</span>, <span class="dv">0</span>)</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>D  <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(Z<span class="sc">==</span><span class="dv">1</span>, D1, D0)</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>tau <span class="ot">&lt;-</span> <span class="fl">1.0</span></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>Y0 <span class="ot">&lt;-</span> <span class="fl">0.2</span> <span class="sc">+</span> <span class="fl">0.3</span><span class="sc">*</span>X <span class="sc">+</span> <span class="fu">rnorm</span>(n)</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>Y1 <span class="ot">&lt;-</span> Y0 <span class="sc">+</span> tau</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>Y  <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(D<span class="sc">==</span><span class="dv">1</span>, Y1, Y0)</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>ivdf <span class="ot">&lt;-</span> <span class="fu">tibble</span>(Y, D, Z, type)</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>ITT_Y <span class="ot">&lt;-</span> <span class="fu">with</span>(ivdf, <span class="fu">mean</span>(Y[Z<span class="sc">==</span><span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">mean</span>(Y[Z<span class="sc">==</span><span class="dv">0</span>]))</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>ITT_D <span class="ot">&lt;-</span> <span class="fu">with</span>(ivdf, <span class="fu">mean</span>(D[Z<span class="sc">==</span><span class="dv">1</span>]) <span class="sc">-</span> <span class="fu">mean</span>(D[Z<span class="sc">==</span><span class="dv">0</span>]))</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>Wald  <span class="ot">&lt;-</span> ITT_Y <span class="sc">/</span> ITT_D</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">quantity =</span> <span class="fu">c</span>(<span class="st">"ITT_Y"</span>, <span class="st">"First stage (ITT_D)"</span>, <span class="st">"Wald LATE"</span>),</span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">estimate =</span> <span class="fu">c</span>(ITT_Y, ITT_D, Wald)</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 3 × 2
+  quantity            estimate
+  &lt;chr&gt;                  &lt;dbl&gt;
+1 ITT_Y                  0.340
+2 First stage (ITT_D)    0.351
+3 Wald LATE              0.969</code></pre>
+</div>
+</div>
+<p>2SLS:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">"ivreg"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  fit <span class="ot">&lt;-</span> ivreg<span class="sc">::</span><span class="fu">ivreg</span>(Y <span class="sc">~</span> D <span class="sc">|</span> Z, <span class="at">data =</span> ivdf)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  broom<span class="sc">::</span><span class="fu">tidy</span>(fit)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<hr>
+</section>
+<section id="optional-real-data-lalonde-job-training" class="level2">
+<h2 class="anchored" data-anchor-id="optional-real-data-lalonde-job-training">5. Optional real data: Lalonde job training</h2>
+<p><code>marginaleffects::avg_comparisons()</code> can be used to estimate ATE/ATT/CATE from regression models with covariates, which is a common approach in applied work. The <code>lalonde</code> dataset from <code>MatchIt</code> (or similar datasets in <code>causaldata</code>) is a classic example for evaluating the effect of a job training program on earnings, where treatment assignment is confounded by observed covariates. The <code>avg_comparisons()</code> function computes average marginal effects, which can be interpreted as ATE/ATT/CATE depending on the specification of the model and the variables included. In this case, it will provide an estimate of the average effect of the treatment (<code>treat</code>) on the outcome (<code>re78</code>), controlling for the covariates included in the regression model.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>get_jobtraining_data <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">"MatchIt"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">data</span>(<span class="st">"lalonde"</span>, <span class="at">package =</span> <span class="st">"MatchIt"</span>)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">as_tibble</span>(lalonde))</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">"causaldata"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    avail <span class="ot">&lt;-</span> <span class="fu">data</span>(<span class="at">package =</span> <span class="st">"causaldata"</span>)<span class="sc">$</span>results[, <span class="st">"Item"</span>]</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    cand <span class="ot">&lt;-</span> avail[<span class="fu">grepl</span>(<span class="st">"lalonde|nsw|job|train"</span>, avail, <span class="at">ignore.case =</span> <span class="cn">TRUE</span>)]</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">message</span>(<span class="st">"Datasets in causaldata matching lalonde/nsw/job/train:</span><span class="sc">\n</span><span class="st">"</span>, <span class="fu">paste</span>(cand, <span class="at">collapse =</span> <span class="st">", "</span>))</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stop</span>(<span class="st">"No `lalonde` dataset found in `causaldata` here. Install `MatchIt` for the classic Lalonde dataset."</span>)</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">stop</span>(<span class="st">"Install `MatchIt` (recommended): install.packages('MatchIt')"</span>)</span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>l <span class="ot">&lt;-</span> <span class="fu">get_jobtraining_data</span>()</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(l)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 614
+Columns: 9
+$ treat    &lt;int&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
+$ age      &lt;int&gt; 37, 22, 30, 27, 33, 22, 23, 32, 22, 33, 19, 21, 18, 27, 17, 1…
+$ educ     &lt;int&gt; 11, 9, 12, 11, 8, 9, 12, 11, 16, 12, 9, 13, 8, 10, 7, 10, 13,…
+$ race     &lt;fct&gt; black, hispan, black, black, black, black, black, black, blac…
+$ married  &lt;int&gt; 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0…
+$ nodegree &lt;int&gt; 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1…
+$ re74     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+$ re75     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+$ re78     &lt;dbl&gt; 9930.0460, 3595.8940, 24909.4500, 7506.1460, 289.7899, 4056.4…</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>m <span class="ot">&lt;-</span> <span class="fu">lm</span>(re78 <span class="sc">~</span> treat <span class="sc">+</span> age <span class="sc">+</span> educ <span class="sc">+</span> race <span class="sc">+</span> married <span class="sc">+</span> nodegree <span class="sc">+</span> re74 <span class="sc">+</span> re75,</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">data =</span> l)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">requireNamespace</span>(<span class="st">"marginaleffects"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) {</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(marginaleffects)</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">avg_comparisons</span>(m, <span class="at">variables =</span> <span class="st">"treat"</span>)</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+ Estimate Std. Error    z Pr(&gt;|z|)   S 2.5 % 97.5 %
+     1548        781 1.98   0.0475 4.4    17   3080
+
+Term: treat
+Type: response
+Comparison: 1 - 0</code></pre>
+</div>
+</div>
+<hr>
+</section>
+<section id="estimands-and-estimators-included-cheat-sheet" class="level2">
+<h2 class="anchored" data-anchor-id="estimands-and-estimators-included-cheat-sheet">7. Estimands and estimators included (cheat sheet)</h2>
+<section id="estimands-theoretical" class="level3">
+<h3 class="anchored" data-anchor-id="estimands-theoretical">Estimands (theoretical)</h3>
+<ul>
+<li><strong>ATE</strong>: The average treatment effect (ATE) is the average difference in potential outcomes between individuals who receive the treatment and those who do not.</li>
+<li><strong>ATT</strong>: The average treatment effect on the treated (ATT) is the average difference in potential outcomes for individuals who are actually treated.</li>
+<li><strong>ATC</strong>: The average treatment effect on the controls (ATC) is the average difference in potential outcomes for individuals who are not treated.</li>
+<li><strong>CATE</strong>: The conditional average treatment effect (CATE) is the average treatment effect conditional on observed covariates (X=x).</li>
+<li><strong>Causal interaction</strong>: The causal interaction effect in a factorial design is the difference in treatment effects across levels of another factor.</li>
+<li><strong>CDE(m)</strong>: The controlled direct effect (CDE) of a treatment on an outcome is the effect of the treatment on the outcome when the mediator is held fixed at a specific value (interaction of D and M).</li>
+<li><strong>NDE</strong>: The natural direct effect (NDE) of a treatment on an outcome is the effect of the treatment on the outcome that is not mediated through a specific mediator variable, while allowing the mediator to take its natural value as it would under no treatment.</li>
+<li><strong>NIE</strong>: The natural indirect effect (NIE) of a treatment on an outcome is the effect of the treatment on the outcome that is mediated through a specific mediator variable, while allowing the mediator to take its natural value as it would under no treatment.</li>
+<li><strong>ITT</strong>: The intention-to-treat (ITT) effect is the average effect of being assigned to the treatment group, regardless of whether individuals actually received the treatment or not. It captures the effect of the assignment itself, which can be useful for policy evaluation and real-world applicability.</li>
+<li><strong>LATE (Wald)</strong>: The Local Average Treatment Effect (LATE) is the average effect of the treatment for the subgroup of individuals who comply with their assigned treatment. It is estimated using the Wald estimator, which divides the ITT effect on the outcome by the ITT effect on the treatment received, effectively isolating the effect for compliers. The formula for the Wald estimator is:</li>
+</ul>
+</section>
+<section id="example-estimators-empirical-procedures" class="level3">
+<h3 class="anchored" data-anchor-id="example-estimators-empirical-procedures">Example estimators (empirical procedures)</h3>
+<ul>
+<li>Difference-in-means (RCT / ITT)</li>
+<li>Regression adjustment / g-formula (predict potential outcomes, then average)</li>
+<li>IPW (ATE and ATT weighting)</li>
+<li>Wald ratio and (optional) 2SLS for LATE</li>
+<li><code>mediation::mediate()</code> for NDE/NIE</li>
+<li><code>marginaleffects::avg_comparisons()</code> for regression-based ATE/ATT/CATE with covariates</li>
+</ul>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

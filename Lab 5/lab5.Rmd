@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 ```{r packages}
-install.packages("remotes")
+# install.packages("remotes")
 
 remotes::install_github(
   "ddimmery/regweight",

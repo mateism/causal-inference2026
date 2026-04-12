@@ -16,7 +16,7 @@ knitr::opts_chunk$set(fig.width=4, fig.height=3)
 # install.packages(c('tidyverse', 'here'))
 library(tidyverse)
 library(here)
-df <- readr::read_tsv("Lab 1/full_potential_outcomes.tsv")
+df <- readr::read_tsv("./full_potential_outcomes.tsv")
 ```
 
 The data contains the following columns:
@@ -185,7 +185,7 @@ coef(lm(y_confound ~ t_confound + x, data=df))["t_confound"]
   
 ```{r}
 # Load the Lalonde dataset
-load("Lab 1/lalonde.RData")
+load("./lalonde.RData")
 
 # Import functions from GitHub
 source("https://github.com/xuyiqing/lalonde/blob/main/tutorial/functions.R?raw=TRUE")

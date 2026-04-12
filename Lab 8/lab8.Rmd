@@ -224,7 +224,7 @@ This means that for the subgroup of compliers, who watched the debate because th
 
 ## Example for the extension outcome (`infopro`)
 
-```{r exercise-wald-infopro, eval=FALSE}
+```{r exercise-wald-infopro, eval=TRUE}
 m_rf_info <- lm(infopro ~ conditn, data = fd)
 m_first_info <- lm(watchpro ~ conditn, data = fd)
 wald_info <- coef(m_rf_info)["conditn"] / coef(m_first_info)["conditn"]
@@ -376,7 +376,7 @@ profile_readnews_df
 
 You can repeat this for other covariates such as `partyid`, `watchnat`, or `educad`. 
 You can also write a function to automate this process and create a combined plot of covariate profiles for compliers, always-takers, and never-takers across multiple covariates.
-```{r iv-info-comparison, eval=FALSE}
+```{r iv-info-comparison, eval=TRUE}
 profile_iv_var <- function(data, var, D = "watchpro", Z = "conditn", label = NULL) {
   
   out_df <- as.data.frame(
@@ -468,7 +468,7 @@ m_iv_info <- ivreg(infopro ~ watchpro | conditn, data = fd_info)
 summary(m_iv_info, diagnostics = TRUE)
 ```
 
-```{r iv-info-adjusted, eval=FALSE}
+```{r iv-info-adjusted, eval=TRUE}
 m_iv_info_adj <- ivreg(
   infopro ~ watchpro + partyid + pnintst + watchnat + educad +
     readnews + gender + income + white |
