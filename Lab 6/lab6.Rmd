@@ -117,7 +117,7 @@ Here we compare a few important covariates directly.
 
 ```{r raw-covariate-overlap, fig.height=6}
 plot_df <- ldw_cps %>%
-  select(treat, age, education, re74, re75) %>%
+  dplyr::select(treat, age, education, re74, re75) %>%
   pivot_longer(cols = c(age, education, re74, re75),
                names_to = "variable", values_to = "value") %>%
   mutate(group = if_else(treat == 1, "Treated", "Control"))
