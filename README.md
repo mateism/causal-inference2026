@@ -47,8 +47,13 @@ In this week, we move beyond the binary IV setup and study what changes when the
 
 The lab is organized around two empirical examples. First, we use the `SchoolingReturns` dataset distributed in the [`ivreg` package](https://zeileis.github.io/ivreg/articles/ivreg.html), based on [Card (1995)](https://www.nber.org/papers/w4483), to study a multivalued instrument for schooling through proximity to different types of 4-year colleges. Second, we use the `birthwt` dataset distributed in the [`micsr` package](https://rdrr.io/cran/micsr/src/R/datasets.R), originally provided by John Mullahy for [Mullahy (1997)](https://rdrr.io/cran/micsr/man/micsr-package.html), to study cigarette taxes as a continuous instrument for maternal smoking. Because students also need to think about final replication projects, each example closes with a feasible extension and a threshold-based approximation for complier profiling.
 
-## Lab 10 (Synthetic control)
+## Lab 10 (Difference-in-differences)
+In this week, we will learn how to analyze the causal effects of policy interventions that “turn on” at a certain point in time for some units but not for others. The discussion of “modern” difference-in-differences estimators motivates a more general discussion of how to choose “clean controls” appropriate to a specific substantive context. 
+
+The lab uses a classroom 2×2 DiD example from [Library of Statistical Techniques (LOST)](https://lost-stats.github.io/Model_Estimation/Research_Design/two_by_two_difference_in_difference.html) on **marijuana legalization and murder rates**, where treated states legalized marijuana in 2014 and control states did not. The session is structured to estimate the DiD effect with average outcomes and then with regression, and evaluate the identifying assumptions of **no anticipation** and **parallel trends**. This lab emphasizes how to choose a clean control group and how to interpret the DiD estimand as an ATT in a 2×2 design.
+
+## Lab 11 (Synthetic control)
 In this week, we study synthetic control methods for identifying the effects of policy interventions––including those that are implemented for a single unit. We contrast synthetic control with difference-in-differences to consider how distinct sources of randomness in our design motivate our choice of method in the context of panel data. 
 
-## Lab 11 (Mediation, of the Statistical Kind)
+## Lab 12 (Mediation, of the Statistical Kind)
 When policy effects can be realised according to several mechanisms at the same time how important is each route? What happens if one offset the effects of the other? Answering these questions is the task of mediation analysis, beloved of psychologists and communication scholars and, we shall see, rather more difficult than they hoped. 
