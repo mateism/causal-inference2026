@@ -41,7 +41,8 @@ Many empirical papers are not that clean. Policies are often adopted in differen
 - some treated units may act as controls for other treated units before they adopt,
 - and a naive two-way fixed effects regression can mix together comparisons that do not match the causal question we want to answer.
 
-This lab uses a substantive example from **Cheng and Hoekstra (2013), "Does Strengthening Self-Defense Law Deter Crime or Escalate Violence? Evidence from Castle Doctrine."** The paper studies whether Castle Doctrine laws increase homicide. The data are available in the `bacondecomp` package, which makes the application easy to replicate in class.
+This lab uses a substantive example from **Cheng and Hoekstra (2013), "Does Strengthening Self-Defense Law Deter Crime or Escalate Violence? Evidence from Castle Doctrine."** 
+The paper studies whether Castle Doctrine laws increase homicide. The data are available in the `bacondecomp` package, which makes the application easy to replicate in class.
 
 Our plan is:
 
